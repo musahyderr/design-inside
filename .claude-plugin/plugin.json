@@ -1,8 +1,8 @@
 {
-  "name": "editor-mode",
+  "name": "designinside",
   "version": "0.1.0",
   "description": "Visual editor for any localhost site: click an element, change it, and the change is written to your real source files and committed to git. Anything it can't do safely is handed to Claude.",
-  "author": { "name": "editor-mode contributors" },
+  "author": { "name": "designinside contributors" },
   "license": "MIT",
   "keywords": ["visual-editor", "localhost", "css", "tailwind", "design"]
 }

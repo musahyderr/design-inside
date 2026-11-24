@@ -1,14 +1,14 @@
-# How editor-mode works
+# How designinside works
 
 Notes for contributors: the design rules, then how a clicked element is matched to the CSS it edits.
 
 ## Design
 
 ### Intent
-People generate sites with AI and then dislike one small thing (a color, a size, some text, a font). editor-mode lets them click the thing, change it visually, and have the real source updated and committed. Simple changes cost zero AI tokens; anything else is handed to an AI coding agent with full context.
+People generate sites with AI and then dislike one small thing (a color, a size, some text, a font). designinside lets them click the thing, change it visually, and have the real source updated and committed. Simple changes cost zero AI tokens; anything else is handed to an AI coding agent with full context.
 
 ### Goals
-- Turn on with one command (`/editor-mode:start`) on any localhost: plain folder (static) or a running dev server (proxy).
+- Turn on with one command (`/designinside:start`) on any localhost: plain folder (static) or a running dev server (proxy).
 - Click to select, double-click text (or use the Text box) to edit, a panel that shows only the controls that fit the element (text, image, box, inline text) for font, size, weight, color, align, background, corners, width, height, padding, margin, gap and order.
 - Writes go to the real files and become one git commit each, with revert-based undo.
 
@@ -24,13 +24,13 @@ People generate sites with AI and then dislike one small thing (a color, a size,
 - Change kinds: `text`, `text-search`, `inline`, `class`, `class-search`, `css-rule`, `css-new-rule`, `css-var`, `font-link` (optional), `move`.
 - After a save the page reloads, so what you see is what's in the file. The selection and scroll position are restored from sessionStorage.
 - Per-directory `fs.watch` sends SSE so the page reloads when an AI agent edits files. The editor's own writes are suppressed for 1.5 s.
-- Ask AI appends to `.editor-mode/requests.md` (git-excluded). The file starts with instructions, so any AI coding agent can apply it (Claude Code: `/editor-mode:apply`), one commit per request (`editor-mode (ai): …`).
+- Ask AI appends to `.designinside/requests.md` (git-excluded). The file starts with instructions, so any AI coding agent can apply it (Claude Code: `/designinside:apply`), one commit per request (`designinside (ai): …`).
 
 ### Safety rules
 - Refuse rather than guess: stale text or class, element tag mismatch, zero or several search hits. Each refusal offers "Hand to AI".
 - Minimal diffs: HTML byte-range splices; CSS through postcss with untouched formatting.
 - Writes only inside the root; never `.git` or `node_modules`.
-- Undo only reverts editor-mode commits, or AI-agent commits for queued requests, and aborts cleanly on conflict.
+- Undo only reverts designinside commits, or AI-agent commits for queued requests, and aborts cleanly on conflict.
 
 ### Known limits
 - Non-Tailwind framework components: styling goes to the AI agent.

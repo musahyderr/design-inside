@@ -4,7 +4,7 @@
 // element among its parent's element children, from the document down
 // (e.g. "0.1.3.2"). Paths are computed from the source file, never from the
 // live DOM, so they survive text, attribute and style edits made by
-// editor-mode. Only structural moves change paths, and the page reloads then.
+// designinside. Only structural moves change paths, and the page reloads then.
 //
 // All writes are textual splices at parse5 source offsets, so everything
 // outside the edited range stays byte-for-byte identical.

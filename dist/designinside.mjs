@@ -15429,8 +15429,8 @@ function fixIndent(rule2) {
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 var run = promisify(execFile);
-var PREFIX = "editor-mode: ";
-var OURS = /^(Revert ")?editor-mode( \([a-z0-9-]+\))?: /;
+var PREFIX = "designinside: ";
+var OURS = /^(Revert ")?designinside( \([a-z0-9-]+\))?: /;
 async function git(root3, args2) {
   const { stdout } = await run("git", args2, { cwd: root3, maxBuffer: 10 * 1024 * 1024 });
   return stdout.trim();
@@ -15445,7 +15445,7 @@ async function isRepo(root3) {
 async function init(root3) {
   await git(root3, ["init", "-q"]);
   await git(root3, ["add", "-A"]);
-  await git(root3, ["-c", "user.name=editor-mode", "-c", "user.email=editor-mode@localhost", "commit", "-q", "--allow-empty", "-m", "Initial commit (before editor-mode)"]);
+  await git(root3, ["-c", "user.name=designinside", "-c", "user.email=designinside@localhost", "commit", "-q", "--allow-empty", "-m", "Initial commit (before designinside)"]);
 }
 async function dirty(root3, files) {
   if (!files.length) return [];
@@ -15457,7 +15457,7 @@ async function identityArgs(root3) {
     await git(root3, ["config", "user.email"]);
     return [];
   } catch {
-    return ["-c", "user.name=editor-mode", "-c", "user.email=editor-mode@localhost"];
+    return ["-c", "user.name=designinside", "-c", "user.email=designinside@localhost"];
   }
 }
 async function commit(root3, files, message) {
@@ -15479,7 +15479,7 @@ async function history(root3, limit = 30) {
 async function revert(root3, sha) {
   const subject = await git(root3, ["log", "-1", "--format=%s", sha]);
   if (!OURS.test(subject)) {
-    throw Object.assign(new Error("Only editor-mode commits can be undone from the editor."), { code: 400 });
+    throw Object.assign(new Error("Only designinside commits can be undone from the editor."), { code: 400 });
   }
   try {
     await git(root3, [...await identityArgs(root3), "revert", "--no-edit", sha]);
@@ -15499,13 +15499,13 @@ async function filesIn(root3, sha) {
 import fs from "node:fs";
 import path from "node:path";
 var SOURCE_EXT = /* @__PURE__ */ new Set([".html", ".htm", ".jsx", ".tsx", ".js", ".ts", ".vue", ".svelte", ".astro", ".md", ".mdx", ".php", ".erb", ".hbs", ".njk", ".liquid"]);
-var SKIP_DIRS = /* @__PURE__ */ new Set(["node_modules", ".git", "dist", "build", ".next", ".nuxt", ".svelte-kit", ".output", ".vercel", "coverage", ".editor-mode", ".astro", "out"]);
+var SKIP_DIRS = /* @__PURE__ */ new Set(["node_modules", ".git", "dist", "build", ".next", ".nuxt", ".svelte-kit", ".output", ".vercel", "coverage", ".designinside", ".astro", "out"]);
 var PROP = /^-{0,2}[a-zA-Z][\w-]*$/;
 var UNSAFE_VALUE = /[;{}<>\\\r\n\0]/;
 var UNSAFE_SELECTOR = /[;{}<>\\\r\n\0]|\/\*/;
 function validateChange(ch) {
   const bad = (what) => {
-    throw new EditError(`Invalid ${what}: not allowed in an editor-mode change.`, 400);
+    throw new EditError(`Invalid ${what}: not allowed in an designinside change.`, 400);
   };
   if (!ch || typeof ch !== "object" || typeof ch.kind !== "string") bad("change");
   if ("prop" in ch && ch.prop != null && !(typeof ch.prop === "string" && PROP.test(ch.prop))) bad("property name");
@@ -15521,7 +15521,7 @@ function matchEol(before, after) {
   return after.replace(/\r?\n/g, "\r\n");
 }
 async function applyPlan({ root: root3, inRoot, rel, resolveSheet, pageUrl, changes }) {
-  if (!Array.isArray(changes)) throw new EditError("Invalid change list: not allowed in an editor-mode change.", 400);
+  if (!Array.isArray(changes)) throw new EditError("Invalid change list: not allowed in an designinside change.", 400);
   changes.forEach(validateChange);
   const files = /* @__PURE__ */ new Map();
   const get = (abs) => {
@@ -15718,10 +15718,10 @@ var MIME = {
   ".webm": "video/webm",
   ".txt": "text/plain; charset=utf-8"
 };
-var QUEUE_HEADER = `# editor-mode requests
+var QUEUE_HEADER = `# designinside requests
 
 Changes the visual editor couldn't make safely by itself. To apply them, ask your
-AI coding agent: "apply .editor-mode/requests.md" (in Claude Code: /editor-mode:apply).
+AI coding agent: "apply .designinside/requests.md" (in Claude Code: /designinside:apply).
 
 Instructions for the AI agent:
 1. Work through each unchecked "## [ ]" request below, in order.
@@ -15731,7 +15731,7 @@ Instructions for the AI agent:
    files and naming, or Tailwind utilities if it uses Tailwind). Don't touch unrelated code.
 4. Skip a request that is ambiguous or needs a design decision, and add a short note under it.
 5. Commit each applied request on its own, staging only the files you changed, with the message
-   "editor-mode (ai): <short description>", so it can be undone from the editor's History tab.
+   "designinside (ai): <short description>", so it can be undone from the editor's History tab.
 6. Tick the box ("## [x]") and add "Done in <commit sha>" under it.
 
 `;
@@ -15745,7 +15745,7 @@ function createServer({ root: root3, proxy = null, log = console.log }) {
       throw new Error(`--proxy needs a URL or port, got "${proxy}".`);
     }
     if (!/^https?:$/.test(u.protocol) || !/^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/i.test(u.hostname)) {
-      throw new Error(`editor-mode only wraps a dev server on this computer (localhost), not ${u.host}.`);
+      throw new Error(`designinside only wraps a dev server on this computer (localhost), not ${u.host}.`);
     }
   }
   const overlayPath = [path2.join(here, "overlay.js"), path2.join(here, "..", "dist", "overlay.js")].find((p) => fs2.existsSync(p));
@@ -15837,7 +15837,7 @@ function createServer({ root: root3, proxy = null, log = console.log }) {
         if (!files.length) return send(res, 200, { ok: true, noop: true, results: result.results });
         const dirtyFiles = await dirty(root3, files.map(rel));
         if (dirtyFiles.length) {
-          return send(res, 409, { error: `These files have uncommitted changes, so editor-mode won't touch them (its commit would include your work): ${dirtyFiles.join(", ")}. Commit or stash them first.` });
+          return send(res, 409, { error: `These files have uncommitted changes, so designinside won't touch them (its commit would include your work): ${dirtyFiles.join(", ")}. Commit or stash them first.` });
         }
         for (const [abs, content] of Object.entries(result.writes)) {
           recentWrites.set(abs, Date.now());
@@ -15870,15 +15870,15 @@ function createServer({ root: root3, proxy = null, log = console.log }) {
       return send(res, code, { error: e.message, fallback: true });
     }
   }
-  const queueDir = path2.join(root3, ".editor-mode");
+  const queueDir = path2.join(root3, ".designinside");
   const queueFile = path2.join(queueDir, "requests.md");
   async function excludeQueue() {
     try {
       const ex = path2.join(root3, ".git", "info", "exclude");
       const cur = fs2.existsSync(ex) ? await fsp.readFile(ex, "utf8") : "";
-      if (!cur.includes(".editor-mode/")) {
+      if (!cur.includes(".designinside/")) {
         await fsp.mkdir(path2.dirname(ex), { recursive: true });
-        await fsp.appendFile(ex, "\n.editor-mode/\n");
+        await fsp.appendFile(ex, "\n.designinside/\n");
       }
     } catch {
     }
@@ -15929,7 +15929,7 @@ Change only what is asked, keep the existing code style, and don't touch unrelat
     log(`  \u2192 queued for your AI agent: ${b.request}`);
     return { id, file: rel(queueFile), prompt };
   }
-  const IGNORE = /(^|\/)(\.git|node_modules|\.editor-mode|dist|build|\.next|\.nuxt|\.svelte-kit|\.cache)(\/|$)/;
+  const IGNORE = /(^|\/)(\.git|node_modules|\.designinside|dist|build|\.next|\.nuxt|\.svelte-kit|\.cache)(\/|$)/;
   const watchers = /* @__PURE__ */ new Map();
   let watchTimer;
   const changed = (abs) => {
@@ -16004,7 +16004,7 @@ data: ${JSON.stringify({ file: n })}
       res.writeHead(ur.statusCode, h);
       res.end(inject(html));
     });
-    up.on("error", (e) => send(res, 502, `editor-mode could not reach ${proxy}: ${e.message}
+    up.on("error", (e) => send(res, 502, `designinside could not reach ${proxy}: ${e.message}
 Is your dev server running?`, "text/plain"));
     req.pipe(up);
   }
@@ -16018,12 +16018,12 @@ Is your dev server running?`, "text/plain"));
     }
   };
   function refused(req, url) {
-    if (!LOCAL.test(req.headers.host || "")) return [403, "editor-mode only answers on localhost."];
+    if (!LOCAL.test(req.headers.host || "")) return [403, "designinside only answers on localhost."];
     if (url.pathname.startsWith("/__em/") && req.method !== "GET" && req.method !== "HEAD") {
       const origin = req.headers.origin;
       if (origin && (!localOrigin(origin) || new URL(origin).host.toLowerCase() !== req.headers.host.toLowerCase())) return [403, "Requests from other websites are refused."];
       if (req.headers["sec-fetch-site"] && !["same-origin", "none"].includes(req.headers["sec-fetch-site"])) return [403, "Requests from other websites are refused."];
-      if (!/^application\/json\b/i.test(req.headers["content-type"] || "")) return [415, "editor-mode expects JSON."];
+      if (!/^application\/json\b/i.test(req.headers["content-type"] || "")) return [415, "designinside expects JSON."];
     }
     return null;
   }
@@ -16062,15 +16062,15 @@ ${Object.entries(ures.headers).map(([k, v]) => `${k}: ${v}`).join("\r\n")}\r
 
 // bin/cli.js
 var HELP = `
-editor-mode: click any element on your localhost site, change it visually,
+designinside: click any element on your localhost site, change it visually,
 and the change is written into your source files and committed to git.
 
 Usage
-  editor-mode [folder]                 serve a plain HTML/CSS folder (default: .)
-  editor-mode --proxy 5173 [folder]    wrap a running dev server (Vite, Next, Astro, \u2026)
+  designinside [folder]                 serve a plain HTML/CSS folder (default: .)
+  designinside --proxy 5173 [folder]    wrap a running dev server (Vite, Next, Astro, \u2026)
 
 Options
-  --port <n>      port for editor-mode (default 4400)
+  --port <n>      port for designinside (default 4400)
   --proxy <url>   dev server to wrap; a bare port means http://localhost:<port>
   --no-git-check  don't warn when the folder isn't a git repo
   -h, --help
@@ -16110,7 +16110,7 @@ var listen = (port, tries = 10) => {
   server.listen(port, "127.0.0.1", async () => {
     const url = `http://localhost:${port}/`;
     console.log(`
-  editor-mode  ${url}`);
+  designinside  ${url}`);
     console.log(`  ${opt.proxy ? `wrapping     ${opt.proxy}` : "serving     "} ${opt.proxy ? "" : root2}`);
     if (opt.proxy) console.log(`  source       ${root2}`);
     if (!opt.noGit && !await isRepo(root2)) console.log("  note         not a git repo yet; the editor will offer to turn on undo (git init)");

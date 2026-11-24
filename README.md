@@ -1,6 +1,6 @@
-<h1 align="center">editor-mode</h1>
+<h1 align="center">designinside</h1>
 
-<p align="center"><b>Click anything on your localhost site, change it visually, and editor-mode writes the change into your real source files and commits it to git.</b></p>
+<p align="center"><b>Click anything on your localhost site, change it visually, and designinside writes the change into your real source files and commits it to git.</b></p>
 
 <p align="center">
   <a href="https://github.com/musahyderr/designinside/actions/workflows/check.yml"><img alt="check" src="https://github.com/musahyderr/designinside/actions/workflows/check.yml/badge.svg"></a>
@@ -11,7 +11,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Only for your own localhost.** editor-mode runs on your computer and edits the site *you* serve from it (`localhost`, `127.0.0.1`). It can't open, wrap or change anyone else's website, it only answers your own browser, and other websites you visit can't use it.
+> **Only for your own localhost.** designinside runs on your computer and edits the site *you* serve from it (`localhost`, `127.0.0.1`). It can't open, wrap or change anyone else's website, it only answers your own browser, and other websites you visit can't use it.
 
 Built for the moment after an AI generates your site and *one thing* is off: a card color, a heading font, some text. Fix it yourself in seconds, with no prompt and no tokens. For anything bigger, it hands a precise request to your AI coding agent: Claude Code, Gemini CLI, Codex, Cursor or any other.
 
@@ -26,13 +26,13 @@ git clone https://github.com/musahyderr/designinside.git
 ```
 
 ```bash
-node designinside/dist/editor-mode.mjs ./my-site
+node designinside/dist/designinside.mjs ./my-site
 ```
 
 Open **http://localhost:4400**, press **Alt+E** (or click **Edit page**), and click anything. Already running a dev server on, say, port 5173? Wrap it instead, and its hot reload keeps working:
 
 ```bash
-node designinside/dist/editor-mode.mjs --proxy 5173 ./my-site
+node designinside/dist/designinside.mjs --proxy 5173 ./my-site
 ```
 
 The tool is a single bundled file, so there's nothing to `npm install`. Using Claude Code? Install it as a plugin instead: see [With Claude Code](#with-claude-code).
@@ -60,13 +60,13 @@ The panel shows only the controls that fit what you clicked. A heading gets text
 | Resize an image | Width or height, with the other side set to `auto` to keep its proportions |
 | Move an item earlier or later | The two elements, swapped in the HTML source |
 | Edit a Tailwind element | Swapped utilities: `text-slate-900 text-2xl` → `text-[#ea580c] text-[32px]` |
-| Ask for anything else ("zoom the image on hover") | A request in `.editor-mode/requests.md` with the element's file, selector and styles, for your AI agent |
+| Ask for anything else ("zoom the image on hover") | A request in `.designinside/requests.md` with the element's file, selector and styles, for your AI agent |
 
 Every save is **one git commit** that touches only the files it changed. **Undo** is a `git revert`, from the toast or the History tab, and it never rewrites history.
 
 ## Use it with your AI agent
 
-The panel works without any AI. The **Ask AI** tab is for changes it can't make safely, such as layout, new sections, hover effects or React components. Your request is saved to `.editor-mode/requests.md` together with the element's source location and current styles, and the top of that file tells the agent exactly what to do.
+The panel works without any AI. The **Ask AI** tab is for changes it can't make safely, such as layout, new sections, hover effects or React components. Your request is saved to `.designinside/requests.md` together with the element's source location and current styles, and the top of that file tells the agent exactly what to do.
 
 ### With Claude Code
 
@@ -75,19 +75,19 @@ The panel works without any AI. The **Ask AI** tab is for changes it can't make 
 ```
 
 ```bash
-/plugin install editor-mode@editor-mode
+/plugin install designinside@designinside
 ```
 
 Then, in your project:
 
-- `/editor-mode:start` finds your running dev server or HTML folder and starts the editor.
-- `/editor-mode:apply` applies what you queued, one commit per request, so each one can be undone from the editor.
+- `/designinside:start` finds your running dev server or HTML folder and starts the editor.
+- `/designinside:apply` applies what you queued, one commit per request, so each one can be undone from the editor.
 
 ### With Gemini CLI, Codex, Cursor, Copilot or any other agent
 
 Start the editor as in [Quick start](#quick-start), queue requests in the **Ask AI** tab, then tell your agent:
 
-> apply .editor-mode/requests.md
+> apply .designinside/requests.md
 
 No coding agent? Click **Copy prompt** on the toast and paste it into any AI chat.
 
@@ -103,7 +103,7 @@ No coding agent? Click **Copy prompt** on the toast and paste it into any AI cha
 ## How it works
 
 ```
-browser ── localhost:4400 ── editor-mode ── (your files | your dev server on localhost)
+browser ── localhost:4400 ── designinside ── (your files | your dev server on localhost)
    │                             │
    overlay (shadow DOM)          ├─ tags each served element with data-em="file#element-path"
    ├─ reads the live CSSOM       ├─ applies a batch of changes in memory; writes only if all succeed
@@ -134,7 +134,7 @@ Others work on the same idea in different ways:
 - [Layrr](https://github.com/narnia-sh/layrr), [PulseDev](https://www.producthunt.com/posts/pulsedev) and [Fronti](https://chromewebstore.google.com/detail/visual-editor-ai/jojjbmgmggenijlkhjeaiodfoggjcjgj) send every click-and-describe change to an AI agent.
 - [Chrome DevTools Workspaces](https://developer.chrome.com/docs/devtools/workspaces) can save CSS edits to local files.
 
-editor-mode aims to be small and safe: it works on any local site, makes simple edits with no AI, turns every save into an undoable git commit, works with any AI agent or none, and only ever touches your own localhost.
+designinside aims to be small and safe: it works on any local site, makes simple edits with no AI, turns every save into an undoable git commit, works with any AI agent or none, and only ever touches your own localhost.
 
 ## Contributing
 
