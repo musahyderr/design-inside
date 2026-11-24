@@ -1,4 +1,4 @@
-// End-to-end for proxy mode: editor-mode wraps a running dev server.
+// End-to-end for proxy mode: designinside wraps a running dev server.
 //   node test/e2e-proxy.cjs http://localhost:<editor port> /path/to/site
 // The site is a git copy of test/fixtures/proxy-app served by test/fixtures/devserver.cjs.
 const { chromium } = require('playwright');
@@ -16,12 +16,12 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  const ui = (sel) => page.locator('editor-mode-root').locator(sel);
+  const ui = (sel) => page.locator('designinside-root').locator(sel);
   const waitReload = async (fn) => { await Promise.all([page.waitForEvent('load'), fn()]); await page.waitForTimeout(400); };
 
   await page.goto(base);
   await page.waitForSelector('.dyn');
-  check(await page.locator('editor-mode-root').count() === 1, 'proxy: overlay is injected into the dev server page');
+  check(await page.locator('designinside-root').count() === 1, 'proxy: overlay is injected into the dev server page');
   await page.keyboard.press('Alt+e');
 
   // 1. HTML the dev server serves verbatim is source-mapped
@@ -50,7 +50,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   check(/\.dyn \{\n  color: #dc2626;\n\}/.test(read('styles.css')), 'proxy: CSS rule edited in styles.css');
   check(log().length === 4, `proxy: one commit per save (${log().length - 1} saves)`);
 
-  // 4. the dev server's hot-reload WebSocket still works through editor-mode
+  // 4. the dev server's hot-reload WebSocket still works through designinside
   const msg = await page.evaluate(() => new Promise((resolve) => {
     const ws = new WebSocket(location.origin.replace('http', 'ws') + '/hmr');
     ws.onmessage = (e) => resolve(e.data); ws.onerror = () => resolve('error'); setTimeout(() => resolve('timeout'), 3000);

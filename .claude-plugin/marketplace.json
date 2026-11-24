@@ -1,12 +1,12 @@
 {
-  "name": "editor-mode",
-  "description": "editor-mode: a visual editor for sites on your own localhost that writes changes into your source files and commits them.",
+  "name": "designinside",
+  "description": "designinside: a visual editor for sites on your own localhost that writes changes into your source files and commits them.",
   "owner": {
-    "name": "editor-mode contributors"
+    "name": "designinside contributors"
   },
   "plugins": [
     {
-      "name": "editor-mode",
+      "name": "designinside",
       "source": "./",
       "description": "Click-to-edit visual editor for localhost sites, with git commits and an AI hand-off for complex changes."
     }

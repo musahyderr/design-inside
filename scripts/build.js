@@ -9,7 +9,7 @@ await build({
 await build({
   entryPoints: ['bin/cli.js'],
   bundle: true, platform: 'node', format: 'esm', target: 'node22',
-  outfile: 'dist/editor-mode.mjs', legalComments: 'none',
+  outfile: 'dist/designinside.mjs', legalComments: 'none',
   banner: { js: "#!/usr/bin/env node\nimport { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
 });
-console.log('built dist/overlay.js and dist/editor-mode.mjs');
+console.log('built dist/overlay.js and dist/designinside.mjs');

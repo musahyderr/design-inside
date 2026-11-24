@@ -1,4 +1,4 @@
-// editor-mode overlay. Injected into every page by the editor-mode server.
+// designinside overlay. Injected into every page by the designinside server.
 // Everything lives in a shadow root so the page's CSS can't touch the editor
 // and the editor's CSS can't leak into the page.
 
@@ -7,8 +7,8 @@ import { ruleKey } from '../src/norm.js';
 import { STYLES } from './styles.js';
 
 (() => {
-  if (window.__editorMode) return;
-  window.__editorMode = true;
+  if (window.__designinside) return;
+  window.__designinside = true;
 
   const API = '/__em/';
   const FONTS = [
@@ -26,7 +26,7 @@ import { STYLES } from './styles.js';
     { name: 'IBM Plex Mono', css: '"IBM Plex Mono", ui-monospace, monospace' },
   ];
   const PSEUDO_STATE = /:(hover|focus|focus-visible|focus-within|active|visited|target|checked)\b/;
-  const SS_KEY = 'editor-mode:state';
+  const SS_KEY = 'designinside:state';
 
   // ---------------------------------------------------------------- state
   const st = {
@@ -41,14 +41,14 @@ import { STYLES } from './styles.js';
   };
 
   // ---------------------------------------------------------------- dom
-  const host = document.createElement('editor-mode-root');
+  const host = document.createElement('designinside-root');
   host.style.cssText = 'all: initial; position: fixed; inset: 0; z-index: 2147483647; pointer-events: none;';
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `<style>${STYLES}</style>
     <div class="hl hover" hidden><span class="tag"></span></div>
     <div class="hl selected" hidden><span class="tag"></span></div>
     <div class="dock">
-      <button class="pill" title="Editor mode (Alt+E)"><span class="dot"></span><span class="pill-label">Edit page</span><kbd>Alt E</kbd></button>
+      <button class="pill" title="designinside (Alt+E)"><span class="dot"></span><span class="pill-label">Edit page</span><kbd>Alt E</kbd></button>
     </div>
     <aside class="panel" hidden></aside>
     <div class="toasts"></div>`;
@@ -395,7 +395,7 @@ import { STYLES } from './styles.js';
         styles,
       });
       st.status.pending = (st.status.pending || 0) + 1;
-      toast(`${quiet ? 'Couldn\'t do this directly, so it\'s queued' : 'Queued'} for your AI agent: “${request}”. Ask it to apply .editor-mode/requests.md (Claude Code: /editor-mode:apply), or copy the prompt into any AI chat.`, {
+      toast(`${quiet ? 'Couldn\'t do this directly, so it\'s queued' : 'Queued'} for your AI agent: “${request}”. Ask it to apply .designinside/requests.md (Claude Code: /designinside:apply), or copy the prompt into any AI chat.`, {
         actions: [{ label: 'Copy prompt', run: () => navigator.clipboard.writeText(r.prompt).then(() => toast('Prompt copied')) }],
       });
       renderDockBadge();
@@ -658,7 +658,7 @@ import { STYLES } from './styles.js';
       ` : st.tab === 'claude' ? `
         <section>
           <h4>Describe a change</h4>
-          <p class="hint">For anything the panel can't do (layout, new sections, hover effects, React components). It's queued in <code>.editor-mode/requests.md</code> with this element's source location and styles. Then ask your AI coding agent (Claude Code, Gemini CLI, Codex, Cursor…) to "apply .editor-mode/requests.md"; in Claude Code that's <code>/editor-mode:apply</code>.</p>
+          <p class="hint">For anything the panel can't do (layout, new sections, hover effects, React components). It's queued in <code>.designinside/requests.md</code> with this element's source location and styles. Then ask your AI coding agent (Claude Code, Gemini CLI, Codex, Cursor…) to "apply .designinside/requests.md"; in Claude Code that's <code>/designinside:apply</code>.</p>
           <textarea class="ask" placeholder="e.g. make this card's image zoom slightly on hover"></textarea>
           <button class="primary send">Queue for AI</button>
         </section>
@@ -680,7 +680,7 @@ import { STYLES } from './styles.js';
       const { commits } = await call('history');
       box.innerHTML = commits.length ? commits.slice(0, 15).map((c) => `
         <div class="commit ${c.ours ? 'ours' : ''}">
-          <div><code>${c.sha}</code> <span class="when">${esc(c.when)}</span><div class="subj">${esc(c.subject.replace(/^editor-mode: /, ''))}</div></div>
+          <div><code>${c.sha}</code> <span class="when">${esc(c.when)}</span><div class="subj">${esc(c.subject.replace(/^designinside: /, ''))}</div></div>
           ${c.ours && !c.subject.startsWith('Revert') ? `<button class="mini undo" data-sha="${c.sha}">Undo</button>` : ''}
         </div>`).join('') : '<p class="hint">No commits yet.</p>';
     } catch (e) { box.textContent = e.message; }

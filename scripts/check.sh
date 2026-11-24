@@ -35,12 +35,12 @@ suite() { # name, test file, url, site
 
 echo "== browser e2e"
 copy examples/charger-site; SITE="$COPY"
-node dist/editor-mode.mjs "$SITE" --port 4499 >/dev/null 2>&1 & PIDS+=($!)
+node dist/designinside.mjs "$SITE" --port 4499 >/dev/null 2>&1 & PIDS+=($!)
 copy test/fixtures/proxy-app; APP="$COPY"
 node test/fixtures/devserver.cjs "$APP" 4496 & PIDS+=($!)
-node dist/editor-mode.mjs --proxy 4496 "$APP" --port 4495 >/dev/null 2>&1 & PIDS+=($!)
+node dist/designinside.mjs --proxy 4496 "$APP" --port 4495 >/dev/null 2>&1 & PIDS+=($!)
 copy test/fixtures/tailwind-site; TW="$COPY"
-node dist/editor-mode.mjs "$TW" --port 4494 >/dev/null 2>&1 & PIDS+=($!)
+node dist/designinside.mjs "$TW" --port 4494 >/dev/null 2>&1 & PIDS+=($!)
 sleep 1.5
 
 suite "static site" test/e2e.cjs http://localhost:4499 "$SITE"

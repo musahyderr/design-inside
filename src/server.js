@@ -18,11 +18,11 @@ const MIME = {
 };
 
 // The queue file explains itself, so any AI coding agent (Claude Code, Gemini CLI,
-// Codex, Cursor…) can be told "apply .editor-mode/requests.md" and know what to do.
-const QUEUE_HEADER = `# editor-mode requests
+// Codex, Cursor…) can be told "apply .designinside/requests.md" and know what to do.
+const QUEUE_HEADER = `# designinside requests
 
 Changes the visual editor couldn't make safely by itself. To apply them, ask your
-AI coding agent: "apply .editor-mode/requests.md" (in Claude Code: /editor-mode:apply).
+AI coding agent: "apply .designinside/requests.md" (in Claude Code: /designinside:apply).
 
 Instructions for the AI agent:
 1. Work through each unchecked "## [ ]" request below, in order.
@@ -32,18 +32,18 @@ Instructions for the AI agent:
    files and naming, or Tailwind utilities if it uses Tailwind). Don't touch unrelated code.
 4. Skip a request that is ambiguous or needs a design decision, and add a short note under it.
 5. Commit each applied request on its own, staging only the files you changed, with the message
-   "editor-mode (ai): <short description>", so it can be undone from the editor's History tab.
+   "designinside (ai): <short description>", so it can be undone from the editor's History tab.
 6. Tick the box ("## [x]") and add "Done in <commit sha>" under it.
 
 `;
 
 export function createServer({ root, proxy = null, log = console.log }) {
   root = path.resolve(root);
-  // editor-mode edits the user's own site only: it wraps dev servers on this machine, never a remote site.
+  // designinside edits the user's own site only: it wraps dev servers on this machine, never a remote site.
   if (proxy) {
     let u; try { u = new URL(proxy); } catch { throw new Error(`--proxy needs a URL or port, got "${proxy}".`); }
     if (!/^https?:$/.test(u.protocol) || !/^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/i.test(u.hostname)) {
-      throw new Error(`editor-mode only wraps a dev server on this computer (localhost), not ${u.host}.`);
+      throw new Error(`designinside only wraps a dev server on this computer (localhost), not ${u.host}.`);
     }
   }
   const overlayPath = [path.join(here, 'overlay.js'), path.join(here, '..', 'dist', 'overlay.js')].find((p) => fs.existsSync(p));
@@ -56,7 +56,7 @@ export function createServer({ root, proxy = null, log = console.log }) {
     if (abs !== root && !abs.startsWith(root + path.sep)) return null;
     const parts = path.relative(root, abs).split(path.sep);
     if (parts.includes('.git') || parts.includes('node_modules')) return null;
-    if (parts.some((p) => p.startsWith('.') && p !== '.' && p !== '..')) return null; // .env, .ssh, .editor-mode…
+    if (parts.some((p) => p.startsWith('.') && p !== '.' && p !== '..')) return null; // .env, .ssh, .designinside…
     return abs;
   };
   const rel = (abs) => path.relative(root, abs).split(path.sep).join('/');
@@ -140,7 +140,7 @@ export function createServer({ root, proxy = null, log = console.log }) {
         if (!files.length) return send(res, 200, { ok: true, noop: true, results: result.results });
         const dirtyFiles = await G.dirty(root, files.map(rel));
         if (dirtyFiles.length) {
-          return send(res, 409, { error: `These files have uncommitted changes, so editor-mode won't touch them (its commit would include your work): ${dirtyFiles.join(', ')}. Commit or stash them first.` });
+          return send(res, 409, { error: `These files have uncommitted changes, so designinside won't touch them (its commit would include your work): ${dirtyFiles.join(', ')}. Commit or stash them first.` });
         }
         for (const [abs, content] of Object.entries(result.writes)) {
           recentWrites.set(abs, Date.now());
@@ -175,13 +175,13 @@ export function createServer({ root, proxy = null, log = console.log }) {
   }
 
   // ---------- AI agent hand-off queue ----------
-  const queueDir = path.join(root, '.editor-mode');
+  const queueDir = path.join(root, '.designinside');
   const queueFile = path.join(queueDir, 'requests.md');
   async function excludeQueue() {
     try {
       const ex = path.join(root, '.git', 'info', 'exclude');
       const cur = fs.existsSync(ex) ? await fsp.readFile(ex, 'utf8') : '';
-      if (!cur.includes('.editor-mode/')) { await fsp.mkdir(path.dirname(ex), { recursive: true }); await fsp.appendFile(ex, '\n.editor-mode/\n'); }
+      if (!cur.includes('.designinside/')) { await fsp.mkdir(path.dirname(ex), { recursive: true }); await fsp.appendFile(ex, '\n.designinside/\n'); }
     } catch { /* not a repo yet */ }
   }
   async function pendingCount() {
@@ -221,7 +221,7 @@ export function createServer({ root, proxy = null, log = console.log }) {
   // One non-recursive watcher per directory. Directory watches keep working
   // when git or an editor replaces a file (new inode); Node's recursive mode
   // on Linux watches files individually and silently loses replaced ones.
-  const IGNORE = /(^|\/)(\.git|node_modules|\.editor-mode|dist|build|\.next|\.nuxt|\.svelte-kit|\.cache)(\/|$)/;
+  const IGNORE = /(^|\/)(\.git|node_modules|\.designinside|dist|build|\.next|\.nuxt|\.svelte-kit|\.cache)(\/|$)/;
   const watchers = new Map();
   let watchTimer;
   const changed = (abs) => {
@@ -282,7 +282,7 @@ export function createServer({ root, proxy = null, log = console.log }) {
       res.writeHead(ur.statusCode, h);
       res.end(inject(html));
     });
-    up.on('error', (e) => send(res, 502, `editor-mode could not reach ${proxy}: ${e.message}\nIs your dev server running?`, 'text/plain'));
+    up.on('error', (e) => send(res, 502, `designinside could not reach ${proxy}: ${e.message}\nIs your dev server running?`, 'text/plain'));
     req.pipe(up);
   }
 
@@ -293,12 +293,12 @@ export function createServer({ root, proxy = null, log = console.log }) {
   const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i;
   const localOrigin = (o) => { try { const u = new URL(o); return /^https?:$/.test(u.protocol) && LOCAL.test(u.host); } catch { return false; } };
   function refused(req, url) {
-    if (!LOCAL.test(req.headers.host || '')) return [403, 'editor-mode only answers on localhost.'];
+    if (!LOCAL.test(req.headers.host || '')) return [403, 'designinside only answers on localhost.'];
     if (url.pathname.startsWith('/__em/') && req.method !== 'GET' && req.method !== 'HEAD') {
       const origin = req.headers.origin;
       if (origin && (!localOrigin(origin) || new URL(origin).host.toLowerCase() !== req.headers.host.toLowerCase())) return [403, 'Requests from other websites are refused.'];
       if (req.headers['sec-fetch-site'] && !['same-origin', 'none'].includes(req.headers['sec-fetch-site'])) return [403, 'Requests from other websites are refused.'];
-      if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return [415, 'editor-mode expects JSON.'];
+      if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return [415, 'designinside expects JSON.'];
     }
     return null;
   }

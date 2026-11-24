@@ -14,7 +14,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  const ui = (sel) => page.locator('editor-mode-root').locator(sel);
+  const ui = (sel) => page.locator('designinside-root').locator(sel);
 
   await page.goto(base);
   await page.waitForTimeout(1500); // let the Tailwind CDN script generate its styles
