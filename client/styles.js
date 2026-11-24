@@ -25,9 +25,41 @@ code { font: 11px ui-monospace, SFMono-Regular, monospace; background: var(--bg3
 .pill.on .dot { background: var(--accent); box-shadow: 0 0 0 4px rgba(139,123,255,.25); }
 .pill:hover { border-color: var(--accent); }
 
-.panel { position: fixed; top: 12px; right: 12px; bottom: 12px; width: 312px; max-width: calc(100vw - 24px); pointer-events: auto; display: flex; flex-direction: column;
+.panel { position: fixed; top: 12px; right: 12px; width: 312px; max-width: calc(100vw - 24px); max-height: calc(100vh - 24px); pointer-events: auto; display: flex; flex-direction: column;
   background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.45); font-size: 12.5px; overflow: hidden; }
-.panel.left { right: auto; left: 12px; }
+/* layout: position and size are set inline by applyLayout() */
+header { cursor: grab; touch-action: none; }
+.panel.dragging, .panel.dragging * { cursor: grabbing !important; user-select: none; }
+.panel.resizing, .panel.resizing * { user-select: none; }
+.hd-actions { display: flex; gap: 2px; flex: 0 0 auto; }
+.hd-actions .ghost { width: 26px; height: 26px; padding: 0; }
+.hd-actions .on { color: var(--accent); }
+.layout-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 14px 10px; }
+.layout-row .seg button { padding: 4px 8px; }
+.layout-row .hint { margin: 0; width: 100%; }
+.panel.min .tabs, .panel.min .body, .panel.min footer, .panel.min .warn, .panel.min .grip, .panel.min .layout-row { display: none; }
+.grip { position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none; z-index: 3;
+  background: linear-gradient(135deg, transparent 45%, var(--dim) 45%, var(--dim) 53%, transparent 53%, transparent 64%, var(--dim) 64%, var(--dim) 72%, transparent 72%); opacity: .7; }
+.grip:hover { opacity: 1; background-color: rgba(59,130,246,.15); border-top-left-radius: 6px; }
+.panel.anchor-right .grip { right: auto; left: 0; cursor: nesw-resize; transform: scaleX(-1); }
+/* resize edge: a thin line along the inner side that lights up blue */
+.edge { position: absolute; top: 0; bottom: 18px; right: 0; width: 8px; cursor: ew-resize; touch-action: none; z-index: 2; }
+.edge::after { content: ''; position: absolute; top: 10px; bottom: 10px; right: 0; width: 3px; border-radius: 3px; background: transparent; transition: background .12s; }
+.edge:hover::after, .panel.resizing .edge::after { background: #3b82f6; }
+.panel.anchor-right .edge { right: auto; left: 0; }
+.panel.anchor-right .edge::after { right: auto; left: 0; }
+.panel.min .edge { display: none; }
+/* bottom edge: stretch the panel taller or shorter (hidden when it already fills the height) */
+.edge-b { position: absolute; left: 22px; right: 22px; bottom: 0; height: 8px; cursor: ns-resize; touch-action: none; z-index: 2; }
+.edge-b::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 0; height: 3px; border-radius: 3px; background: transparent; transition: background .12s; }
+.edge-b:hover::after, .panel.resizing-b .edge-b::after { background: #3b82f6; }
+.panel.min .edge-b, .panel[data-dock="auto"] .edge-b, .panel[data-dock="left"] .edge-b, .panel[data-dock="right"] .edge-b { display: none; }
+/* dark scrollbars inside the panel */
+.panel, .panel * { scrollbar-width: thin; scrollbar-color: #2e2e36 #0d0d10; }
+.panel ::-webkit-scrollbar { width: 8px; height: 8px; }
+.panel ::-webkit-scrollbar-track { background: #0d0d10; }
+.panel ::-webkit-scrollbar-thumb { background: #2e2e36; border-radius: 8px; border: 2px solid #0d0d10; }
+.panel ::-webkit-scrollbar-thumb:hover { background: #45454f; }
 .panel[hidden], .hl[hidden] { display: none; }
 .panel.busy { opacity: .6; pointer-events: none; }
 header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 14px 14px 10px; }

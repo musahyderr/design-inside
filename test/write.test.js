@@ -92,10 +92,10 @@ test('commits by any AI agent for queued requests count as undoable editor commi
   try {
     const git = (a) => execSync(`git -c user.name=t -c user.email=t@localhost ${a}`, { cwd: d, stdio: 'pipe' });
     git('init -q -b main');
-    for (const m of ['user work', 'designinside: color', 'designinside (claude): hover', 'designinside (ai): shadow']) {
+    for (const m of ['user work', 'design-inside: color', 'design-inside (claude): hover', 'design-inside (ai): shadow']) {
       fs.writeFileSync(path.join(d, 'f.txt'), m); git('add -A'); git(`commit -qm "${m}"`);
     }
     const ours = Object.fromEntries((await G.history(d)).map((c) => [c.subject || c.message, c.ours]));
-    assert.deepEqual(ours, { 'designinside (ai): shadow': true, 'designinside (claude): hover': true, 'designinside: color': true, 'user work': false });
+    assert.deepEqual(ours, { 'design-inside (ai): shadow': true, 'design-inside (claude): hover': true, 'design-inside: color': true, 'user work': false });
   } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });

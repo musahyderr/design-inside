@@ -1,4 +1,4 @@
-// designinside overlay. Injected into every page by the designinside server.
+// design-inside overlay. Injected into every page by the design-inside server.
 // Everything lives in a shadow root so the page's CSS can't touch the editor
 // and the editor's CSS can't leak into the page.
 
@@ -7,8 +7,8 @@ import { ruleKey } from '../src/norm.js';
 import { STYLES } from './styles.js';
 
 (() => {
-  if (window.__designinside) return;
-  window.__designinside = true;
+  if (window.__designInside) return;
+  window.__designInside = true;
 
   const API = '/__em/';
   const FONTS = [
@@ -26,7 +26,7 @@ import { STYLES } from './styles.js';
     { name: 'IBM Plex Mono', css: '"IBM Plex Mono", ui-monospace, monospace' },
   ];
   const PSEUDO_STATE = /:(hover|focus|focus-visible|focus-within|active|visited|target|checked)\b/;
-  const SS_KEY = 'designinside:state';
+  const SS_KEY = 'design-inside:state';
 
   // ---------------------------------------------------------------- state
   const st = {
@@ -41,14 +41,14 @@ import { STYLES } from './styles.js';
   };
 
   // ---------------------------------------------------------------- dom
-  const host = document.createElement('designinside-root');
+  const host = document.createElement('design-inside-root');
   host.style.cssText = 'all: initial; position: fixed; inset: 0; z-index: 2147483647; pointer-events: none;';
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `<style>${STYLES}</style>
     <div class="hl hover" hidden><span class="tag"></span></div>
     <div class="hl selected" hidden><span class="tag"></span></div>
     <div class="dock">
-      <button class="pill" title="designinside (Alt+E)"><span class="dot"></span><span class="pill-label">Edit page</span><kbd>Alt E</kbd></button>
+      <button class="pill" title="design-inside (Alt+E)"><span class="dot"></span><span class="pill-label">Edit page</span><kbd>Alt E</kbd></button>
     </div>
     <aside class="panel" hidden></aside>
     <div class="toasts"></div>`;
@@ -395,7 +395,7 @@ import { STYLES } from './styles.js';
         styles,
       });
       st.status.pending = (st.status.pending || 0) + 1;
-      toast(`${quiet ? 'Couldn\'t do this directly, so it\'s queued' : 'Queued'} for your AI agent: “${request}”. Ask it to apply .designinside/requests.md (Claude Code: /designinside:apply), or copy the prompt into any AI chat.`, {
+      toast(`${quiet ? 'Couldn\'t do this directly, so it\'s queued' : 'Queued'} for your AI agent: “${request}”. Ask it to apply .design-inside/requests.md (Claude Code: /design-inside:apply), or copy the prompt into any AI chat.`, {
         actions: [{ label: 'Copy prompt', run: () => navigator.clipboard.writeText(r.prompt).then(() => toast('Prompt copied')) }],
       });
       renderDockBadge();
@@ -412,14 +412,97 @@ import { STYLES } from './styles.js';
     tag.textContent = `${describe(el)}  ${Math.round(r.width)}×${Math.round(r.height)}`;
     tag.classList.toggle('below', r.top < 24);
   }
+  // ---------------------------------------------------------------- panel layout
+  // The panel can be docked (auto/left/right/top/center), dragged anywhere by its
+  // top bar, resized from its corner and collapsed. The layout is remembered per site.
+  const LAYOUT_KEY = 'design-inside:layout';
+  const LAYOUT_DEFAULT = { dock: 'auto', w: 312, h: 560, x: null, y: null, min: false };
+  st.layout = (() => {
+    try { return { ...LAYOUT_DEFAULT, ...JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}') }; } catch { return { ...LAYOUT_DEFAULT }; }
+  })();
+  const saveLayout = () => { try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(st.layout)); } catch { /* storage blocked */ } };
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const MIN_W = 236; // narrow enough to stay out of the way, wide enough for the controls
+  function applyLayout() {
+    const L = st.layout, M = 12, s = panel.style;
+    const w = clamp(L.w, MIN_W, Math.max(MIN_W, innerWidth - 2 * M));
+    const h = clamp(L.h, 200, Math.max(200, innerHeight - 2 * M));
+    s.left = s.right = s.top = s.bottom = s.transform = s.height = '';
+    s.width = `${w}px`;
+    panel.classList.toggle('min', !!L.min);
+    panel.dataset.dock = L.dock;
+    const side = L.dock === 'left' || (L.dock === 'auto' && st.autoLeft) ? 'left' : 'right';
+    panel.classList.toggle('anchor-right', ['auto', 'right'].includes(L.dock) && side === 'right');
+    if (['auto', 'left', 'right'].includes(L.dock)) {
+      s.top = `${M}px`; s[side] = `${M}px`;
+      if (!L.min) s.bottom = `${M}px`;
+    } else if (L.dock === 'top') {
+      s.top = `${M}px`; s.left = '50%'; s.transform = 'translateX(-50%)';
+      if (!L.min) s.height = `${h}px`;
+    } else if (L.dock === 'center') {
+      s.top = '50%'; s.left = '50%'; s.transform = 'translate(-50%, -50%)';
+      if (!L.min) s.height = `${h}px`;
+    } else { // free: wherever it was dragged, kept on screen
+      s.left = `${clamp(L.x ?? innerWidth - w - M, 0, Math.max(0, innerWidth - w))}px`;
+      s.top = `${clamp(L.y ?? M, 0, Math.max(0, innerHeight - 48))}px`;
+      if (!L.min) s.height = `${Math.min(h, innerHeight - clamp(L.y ?? M, 0, innerHeight - 48) - M)}px`;
+    }
+  }
   function dockPanel() {
     if (!st.sel || panel.hidden) return;
-    const r = st.sel.getBoundingClientRect();
-    const w = 336;
-    const coversRight = r.right > innerWidth - w;
-    const roomLeft = r.left > w;
-    panel.classList.toggle('left', coversRight && roomLeft);
+    if (st.layout.dock === 'auto') { // stay out of the way of the selected element
+      const r = st.sel.getBoundingClientRect();
+      const w = st.layout.w + 24;
+      st.autoLeft = r.right > innerWidth - w && r.left > w;
+    }
+    applyLayout();
   }
+  // double-click the top bar: unstick the panel (back to the default place and size)
+  panel.addEventListener('dblclick', (e) => {
+    if (!e.target.closest('header') || e.target.closest('button, input, select, textarea')) return;
+    st.layout = { ...LAYOUT_DEFAULT }; saveLayout(); renderPanel(); applyLayout();
+  });
+  // drag the top bar to move, drag the corner to resize
+  panel.addEventListener('pointerdown', (e) => {
+    const edge = e.target.closest('.edge');
+    const edgeB = e.target.closest('.edge-b');
+    const grip = e.target.closest('.grip') || edge || edgeB;
+    const bar = !grip && e.target.closest('header') && !e.target.closest('button, input, select, textarea');
+    if (!grip && !bar) return;
+    e.preventDefault();
+    const r = panel.getBoundingClientRect();
+    const start = { x: e.clientX, y: e.clientY, left: r.left, top: r.top, w: r.width, h: r.height };
+    const anchorRight = panel.classList.contains('anchor-right');
+    // A click (or double-click) on the top bar must not detach the panel:
+    // the drag only starts once the pointer has moved a few pixels.
+    let started = false;
+    const begin = () => {
+      started = true;
+      if (bar) Object.assign(st.layout, { dock: 'free', x: r.left, y: r.top, w: r.width, h: st.layout.min ? st.layout.h : r.height });
+      panel.classList.add(bar ? 'dragging' : edgeB ? 'resizing-b' : 'resizing');
+    };
+    if (!bar) begin();
+    const move = (ev) => {
+      const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
+      if (!started) { if (Math.hypot(dx, dy) < 4) return; begin(); }
+      if (bar) { st.layout.x = start.left + dx; st.layout.y = start.top + dy; } else {
+        if (!edgeB) st.layout.w = clamp(start.w + (anchorRight ? -dx : dx), MIN_W, innerWidth - 24);
+        if (!edge && !['auto', 'left', 'right'].includes(st.layout.dock)) st.layout.h = clamp(start.h + dy, 200, innerHeight - 24);
+      }
+      applyLayout();
+    };
+    // listen on window (not pointer capture), so clicks and double-clicks reach their targets
+    const up = () => {
+      removeEventListener('pointermove', move, true);
+      removeEventListener('pointerup', up, true);
+      removeEventListener('pointercancel', up, true);
+      panel.classList.remove('dragging', 'resizing', 'resizing-b');
+      if (started) saveLayout();
+    };
+    addEventListener('pointermove', move, true);
+    addEventListener('pointerup', up, true);
+    addEventListener('pointercancel', up, true);
+  });
   function positionBoxes() {
     dockPanel();
     place(hoverBox, st.on && st.hover && st.hover !== st.sel ? st.hover : null);
@@ -587,7 +670,7 @@ import { STYLES } from './styles.js';
     const k = kindOf(el, cs);
 
     panel.innerHTML = `
-      <header>
+      <header title="Drag to move · double-click to put the panel back">
         <div class="crumb">
           ${el.parentElement && el.parentElement !== document.body ? `<button class="ghost up" title="Select parent">↖</button>` : ''}
           <div>
@@ -595,8 +678,17 @@ import { STYLES } from './styles.js';
             <div class="src">${loc ? `${esc(loc.file)} · source-mapped` : tw ? 'Tailwind · found by search' : 'rendered by your framework'}</div>
           </div>
         </div>
-        <button class="ghost close" title="Close (Esc)">✕</button>
+        <div class="hd-actions">
+          <button class="ghost layout-btn ${st.layoutOpen ? 'on' : ''}" title="Move or resize this panel">⇱</button>
+          <button class="ghost min-btn" title="${st.layout.min ? 'Expand' : 'Collapse'} this panel">${st.layout.min ? '▢' : '–'}</button>
+          <button class="ghost close" title="Close (Esc)">✕</button>
+        </div>
       </header>
+      ${st.layoutOpen ? `<div class="layout-row">
+        <div class="seg">${[['left', '◧ Left'], ['top', '⬒ Top'], ['center', '▣ Center'], ['right', '◨ Right']].map(([d, t]) => `<button data-dock="${d}" class="${st.layout.dock === d ? 'on' : ''}">${t}</button>`).join('')}</div>
+        <button class="mini reset-layout" title="Back to the default position and size">Reset</button>
+        <p class="hint">Or drag this top bar to put the panel anywhere, and double-click it to put the panel back. Drag a blue edge or the corner to resize it.</p>
+      </div>` : ''}
       <nav class="tabs">
         <button data-tab="style" class="${st.tab === 'style' ? 'on' : ''}">Design</button>
         <button data-tab="claude" class="${st.tab === 'claude' ? 'on' : ''}">Ask AI${st.status.pending ? ` <b>${st.status.pending}</b>` : ''}</button>
@@ -658,13 +750,16 @@ import { STYLES } from './styles.js';
       ` : st.tab === 'claude' ? `
         <section>
           <h4>Describe a change</h4>
-          <p class="hint">For anything the panel can't do (layout, new sections, hover effects, React components). It's queued in <code>.designinside/requests.md</code> with this element's source location and styles. Then ask your AI coding agent (Claude Code, Gemini CLI, Codex, Cursor…) to "apply .designinside/requests.md"; in Claude Code that's <code>/designinside:apply</code>.</p>
+          <p class="hint">For anything the panel can't do (layout, new sections, hover effects, React components). It's queued in <code>.design-inside/requests.md</code> with this element's source location and styles. Then ask your AI coding agent (Claude Code, Gemini CLI, Codex, Cursor…) to "apply .design-inside/requests.md"; in Claude Code that's <code>/design-inside:apply</code>.</p>
           <textarea class="ask" placeholder="e.g. make this card's image zoom slightly on hover"></textarea>
           <button class="primary send">Queue for AI</button>
         </section>
       ` : `<section class="history"><h4>Recent commits</h4><div class="hist">Loading…</div></section>`}
       </div>
-      <footer class="pending"></footer>`;
+      <footer class="pending"></footer>
+      <div class="edge" title="Drag to make the panel wider or narrower"></div>
+      <div class="edge-b" title="Drag to make the panel taller or shorter"></div>
+      <div class="grip" title="Drag to resize"></div>`;
 
     if (st.tab === 'history') loadHistory();
     renderPending();
@@ -680,7 +775,7 @@ import { STYLES } from './styles.js';
       const { commits } = await call('history');
       box.innerHTML = commits.length ? commits.slice(0, 15).map((c) => `
         <div class="commit ${c.ours ? 'ours' : ''}">
-          <div><code>${c.sha}</code> <span class="when">${esc(c.when)}</span><div class="subj">${esc(c.subject.replace(/^designinside: /, ''))}</div></div>
+          <div><code>${c.sha}</code> <span class="when">${esc(c.when)}</span><div class="subj">${esc(c.subject.replace(/^design-inside: /, ''))}</div></div>
           ${c.ours && !c.subject.startsWith('Revert') ? `<button class="mini undo" data-sha="${c.sha}">Undo</button>` : ''}
         </div>`).join('') : '<p class="hint">No commits yet.</p>';
     } catch (e) { box.textContent = e.message; }
@@ -709,6 +804,10 @@ import { STYLES } from './styles.js';
     const b = e.target.closest('button');
     if (!b) return;
     if (b.classList.contains('close')) return pick(null);
+    if (b.classList.contains('layout-btn')) { st.layoutOpen = !st.layoutOpen; return renderPanel(); }
+    if (b.classList.contains('min-btn')) { st.layout.min = !st.layout.min; saveLayout(); renderPanel(); return applyLayout(); }
+    if (b.dataset.dock) { st.layout.dock = b.dataset.dock; st.layout.min = false; saveLayout(); renderPanel(); return applyLayout(); }
+    if (b.classList.contains('reset-layout')) { st.layout = { ...LAYOUT_DEFAULT }; saveLayout(); renderPanel(); return applyLayout(); }
     if (b.classList.contains('up')) return pick(st.sel.parentElement);
     if (b.dataset.tab) { st.tab = b.dataset.tab; return renderPanel(); }
     if (b.dataset.scope) { st.scope = b.dataset.scope; restage(); renderPanel(); positionBoxes(); return; }

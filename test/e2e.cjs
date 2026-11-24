@@ -1,5 +1,5 @@
 // End-to-end: drives the real overlay in Chromium against a running
-// designinside server and checks the files on disk and the git log.
+// design-inside server and checks the files on disk and the git log.
 //   node test/e2e.cjs http://localhost:4400 /path/to/site [screenshot-dir]
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -18,7 +18,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const shot = async (name) => { if (shots) await page.screenshot({ path: path.join(shots, `${String(++n).padStart(2, '0')}-${name}.png`) }); };
-  const ui = (sel) => page.locator('designinside-root').locator(sel);
+  const ui = (sel) => page.locator('design-inside-root').locator(sel);
   const waitReload = async (fn) => { await Promise.all([page.waitForEvent('load'), fn()]); await page.waitForTimeout(400); };
 
   await page.goto(base);
@@ -49,7 +49,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await waitReload(() => ui('.save').click());
   const css = read('styles.css');
   check(/\.card \{\n  background: #fef9c3;\n  border: 1px solid #e2e8f0;\n  border-radius: var\(--radius\);\n  padding: 32px;\n\}/.test(css), 'styles.css .card rule rewritten in place, formatting kept');
-  check(log()[0].startsWith('designinside: article.card background-color: #fef9c3 (.card in styles.css)'), `commit: "${log()[0]}"`);
+  check(log()[0].startsWith('design-inside: article.card background-color: #fef9c3 (.card in styles.css)'), `commit: "${log()[0]}"`);
   const diff = execSync('git show --stat --format= HEAD', { cwd: site }).toString();
   check(/styles\.css \| 4 \+\+--/.test(diff) && !/index\.html/.test(diff), 'commit touches only styles.css, 2 lines');
   await shot('saved');
@@ -103,7 +103,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
 
   // 8. reorder: move the Studio card earlier
   await page.click('.card:nth-child(3)', { position: { x: 8, y: 8 } });
-  check(await ui('.panel.left').count() === 1, 'panel docks left so it doesn\'t cover the selected card');
+  check((await ui('.panel').evaluate((p) => p.getBoundingClientRect().left)) < 50, 'panel docks left so it doesn\'t cover the selected card');
   await waitReload(() => ui('.move[data-dir="up"]').click());
   const order = await page.$$eval('.card h3', (e) => e.map((x) => x.textContent));
   check(order.join() === 'Pocket,Studio,Everyday', `cards reordered in the source: ${order.join(', ')}`);
@@ -116,7 +116,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await waitReload(() => ui('.undo').first().click());
   const order2 = await page.$$eval('.card h3', (e) => e.map((x) => x.textContent));
   check(order2.join() === 'Pocket,Everyday,Studio', 'undo reverts the reorder with a revert commit');
-  check(log()[0].startsWith('Revert "designinside: move'), `history kept: "${log()[0]}"`);
+  check(log()[0].startsWith('Revert "design-inside: move'), `history kept: "${log()[0]}"`);
 
   // 9b. the panel adapts to what you click, and has a Text box
   await page.click('.lede');
@@ -130,7 +130,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   check((await page.textContent('.lede')) === 'Fast charging for every device you own.', 'Text box previews the new text on the page');
   await waitReload(() => ui('.save').click());
   check(read('index.html').includes('<p class="lede">Fast charging for every device you own.</p>'), 'Text box writes the new text to index.html');
-  check(log()[0].startsWith('designinside:'), `Text box edit is committed: "${log()[0]}"`);
+  check(log()[0].startsWith('design-inside:'), `Text box edit is committed: "${log()[0]}"`);
 
   await page.click('.hero-actions .btn');
   check((await ui('.kind').textContent()) === 'Button', 'a.btn is labelled Button');
@@ -163,10 +163,80 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await page.waitForTimeout(25);
   const drift = await page.evaluate(() => {
     const r = document.querySelector('.card .btn').getBoundingClientRect();
-    const boxes = [...document.querySelector('designinside-root').shadowRoot.querySelectorAll('.hl')].map((x) => x.getBoundingClientRect()).filter((x) => x.width > 0);
+    const boxes = [...document.querySelector('design-inside-root').shadowRoot.querySelectorAll('.hl')].map((x) => x.getBoundingClientRect()).filter((x) => x.width > 0);
     return Math.min(...boxes.map((x) => Math.abs(x.top - r.top)));
   });
   check(drift <= 1, `selection outline follows the element while scrolling (off by ${Math.round(drift)}px)`);
+
+  // 9d. the panel can be docked, dragged, resized and collapsed, and still saves
+  const box = () => ui('.panel').evaluate((p) => { const r = p.getBoundingClientRect(); return { l: r.left, t: r.top, w: r.width, h: r.height, cx: r.left + r.width / 2 }; });
+  await page.click('.hero h1');
+  await ui('.layout-btn').click();
+  await ui('[data-dock="left"]').click();
+  check((await box()).l <= 20, 'panel docks to the left');
+  await ui('[data-dock="center"]').click();
+  const c = await box();
+  check(Math.abs(c.cx - 720) < 4, `panel docks to the center (center at ${Math.round(c.cx)}px of 1440)`);
+  await ui('[data-dock="top"]').click();
+  check((await box()).t <= 20, 'panel docks to the top');
+  const head = await ui('.panel header .src').boundingBox();
+  const before = await box();
+  await page.mouse.move(head.x + 20, head.y + 4);
+  await page.mouse.down();
+  await page.mouse.move(head.x - 180, head.y + 124, { steps: 6 });
+  await page.mouse.up();
+  const moved = await box();
+  check(Math.abs(moved.l - (before.l - 200)) < 3 && Math.abs(moved.t - (before.t + 120)) < 3, `panel can be dragged anywhere by its top bar (moved ${Math.round(moved.l - before.l)}, ${Math.round(moved.t - before.t)})`);
+  const grip = await ui('.grip').boundingBox();
+  await page.mouse.move(grip.x + 8, grip.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + 88, grip.y - 92, { steps: 6 });
+  await page.mouse.up();
+  const sized = await box();
+  check(Math.abs(sized.w - (moved.w + 80)) < 3 && Math.abs(sized.h - (moved.h - 100)) < 3, `panel can be resized from its corner (${Math.round(sized.w)}×${Math.round(sized.h)})`);
+  const edgeBox = await ui('.edge').boundingBox();
+  await page.mouse.move(edgeBox.x + 4, edgeBox.y + edgeBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(edgeBox.x - 116, edgeBox.y + edgeBox.height / 2, { steps: 6 });
+  await page.mouse.up();
+  const narrowed = await box();
+  check(Math.abs(narrowed.w - (sized.w - 120)) < 3 && Math.abs(narrowed.h - sized.h) < 3, `the side edge makes the panel narrower (${Math.round(sized.w)} → ${Math.round(narrowed.w)}px)`);
+  const edge2 = await ui('.edge').boundingBox();
+  await page.mouse.move(edge2.x + 4, edge2.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(edge2.x - 600, edge2.y + 40, { steps: 6 });
+  await page.mouse.up();
+  check(Math.round((await box()).w) === 236, `the panel stops at its minimum width (${Math.round((await box()).w)}px)`);
+  check((await ui('.body').evaluate((b) => getComputedStyle(b).scrollbarColor)).includes('rgb(46, 46, 54)'), 'the panel uses a dark scrollbar');
+  const tall = await box();
+  const eb = await ui('.edge-b').boundingBox();
+  await page.mouse.move(eb.x + eb.width / 2, eb.y + 4);
+  await page.mouse.down();
+  await page.mouse.move(eb.x + eb.width / 2, eb.y - 76, { steps: 6 });
+  await page.mouse.up();
+  const shorter = await box();
+  check(Math.abs(shorter.h - (tall.h - 80)) < 3 && Math.abs(shorter.w - tall.w) < 2, `the bottom edge makes the panel shorter (${Math.round(tall.h)} → ${Math.round(shorter.h)}px)`);
+  await ui('.min-btn').click();
+  check(!(await ui('.body').isVisible()) && (await box()).h < 120, 'panel collapses to its top bar');
+  await ui('.min-btn').click();
+  check(await ui('.body').isVisible(), 'panel expands again');
+  await page.reload(); await page.waitForTimeout(300);
+  if (!(await ui('.pill.on').count())) await page.keyboard.press('Alt+e'); // editing mode itself survives reloads
+  await page.click('.hero h1');
+  const kept = await box();
+  check(Math.abs(kept.l - sized.l) < 3 && Math.round(kept.w) === 236, 'panel position and size are remembered after a reload');
+  await ui('[data-hex="color"]').fill('#7c3aed');
+  await ui('[data-hex="color"]').press('Enter');
+  await waitReload(() => ui('.save').click());
+  check(/<h1 style="[^"]*color: #7c3aed/.test(read('index.html')) && log()[0].startsWith('design-inside:'), `saving still writes and commits with the panel moved ("${log()[0]}")`);
+  await page.click('.hero h1');
+  await ui('.layout-btn').click();
+  await ui('.reset-layout').click();
+  check((await box()).l > 1000, 'Reset puts the panel back on the right');
+  await ui('[data-dock="left"]').click();
+  await ui('.panel header .src').dblclick();
+  check((await box()).l > 1000 && (await ui('.panel').evaluate((p) => p.dataset.dock)) === 'auto', 'double-clicking the top bar puts the panel back');
+  await page.click('.logo', { position: { x: 4, y: 4 } });
 
   // 10. ask AI for something the panel can't do
   await page.click('.card.featured', { position: { x: 8, y: 8 } });
@@ -175,9 +245,9 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await ui('.send').click();
   await page.waitForTimeout(300);
   await shot('ask-ai');
-  const q = read('.designinside/requests.md');
-  check(q.includes('## [ ]') && q.includes('lift slightly') && q.includes('index.html'), 'request queued in .designinside/requests.md with source location');
-  check(!execSync('git status --porcelain', { cwd: site }).toString().includes('.designinside'), 'queue file is git-excluded');
+  const q = read('.design-inside/requests.md');
+  check(q.includes('## [ ]') && q.includes('lift slightly') && q.includes('index.html'), 'request queued in .design-inside/requests.md with source location');
+  check(!execSync('git status --porcelain', { cwd: site }).toString().includes('.design-inside'), 'queue file is git-excluded');
 
   // 11. safety: refuse to edit a file with the user's uncommitted work
   await page.click('.logo', { position: { x: 4, y: 4 } }); // nothing pending, so live reload may run

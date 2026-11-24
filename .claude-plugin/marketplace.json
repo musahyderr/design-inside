@@ -1,12 +1,12 @@
 {
-  "name": "designinside",
-  "description": "designinside: a visual editor for sites on your own localhost that writes changes into your source files and commits them.",
+  "name": "design-inside",
+  "description": "design-inside: a visual editor for sites on your own localhost that writes changes into your source files and commits them.",
   "owner": {
-    "name": "designinside contributors"
+    "name": "design-inside contributors"
   },
   "plugins": [
     {
-      "name": "designinside",
+      "name": "design-inside",
       "source": "./",
       "description": "Click-to-edit visual editor for localhost sites, with git commits and an AI hand-off for complex changes."
     }

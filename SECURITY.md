@@ -1,6 +1,6 @@
 # Security
 
-designinside is a local development tool. It is designed to be used only by the person running it, on their own computer:
+design-inside is a local development tool. It is designed to be used only by the person running it, on their own computer:
 
 - it listens on `127.0.0.1` and refuses requests whose `Host` isn't localhost (DNS rebinding);
 - it refuses writes from other websites (checked through `Origin`, `Sec-Fetch-Site` and JSON-only requests);

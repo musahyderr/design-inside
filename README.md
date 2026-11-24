@@ -1,18 +1,18 @@
-<h1 align="center">designinside</h1>
+<h1 align="center">design-inside</h1>
 
-<p align="center"><b>Click anything on your localhost site, change it visually, and designinside writes the change into your real source files and commits it to git.</b></p>
+<p align="center"><b>Click anything on your localhost site, change it visually, and design-inside writes the change into your real source files and commits it to git.</b></p>
 
 <p align="center">
-  <a href="https://github.com/musahyderr/designinside/actions/workflows/check.yml"><img alt="check" src="https://github.com/musahyderr/designinside/actions/workflows/check.yml/badge.svg"></a>
+  <a href="https://github.com/musahyderr/design-inside/actions/workflows/check.yml"><img alt="check" src="https://github.com/musahyderr/design-inside/actions/workflows/check.yml/badge.svg"></a>
   <a href="#verification"><img alt="tested on Linux, macOS and Windows" src="https://img.shields.io/badge/tested%20on-Linux%20%7C%20macOS%20%7C%20Windows-informational"></a>
-  <a href="#verification"><img alt="90 checks" src="https://img.shields.io/badge/checks-35%20unit%20%2B%2055%20browser-success"></a>
+  <a href="#verification"><img alt="105 checks" src="https://img.shields.io/badge/checks-35%20unit%20%2B%2070%20browser-success"></a>
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%3E%3D22-339933">
   <img alt="works with any AI agent" src="https://img.shields.io/badge/AI%20agent-any%20(or%20none)-8b5cf6">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
 
 > [!IMPORTANT]
-> **Only for your own localhost.** designinside runs on your computer and edits the site *you* serve from it (`localhost`, `127.0.0.1`). It can't open, wrap or change anyone else's website, it only answers your own browser, and other websites you visit can't use it.
+> **Only for your own localhost.** design-inside runs on your computer and edits the site *you* serve from it (`localhost`, `127.0.0.1`). It can't open, wrap or change anyone else's website, it only answers your own browser, and other websites you visit can't use it.
 
 Built for the moment after an AI generates your site and *one thing* is off: a card color, a heading font, some text. Fix it yourself in seconds, with no prompt and no tokens. For anything bigger, it hands a precise request to your AI coding agent: Claude Code, Gemini CLI, Codex, Cursor or any other.
 
@@ -23,17 +23,17 @@ Built for the moment after an AI generates your site and *one thing* is off: a c
 You need [Node.js](https://nodejs.org) 22+ and git, on Linux, macOS or Windows.
 
 ```bash
-git clone https://github.com/musahyderr/designinside.git
+git clone https://github.com/musahyderr/design-inside.git
 ```
 
 ```bash
-node designinside/dist/designinside.mjs ./my-site
+node design-inside/dist/design-inside.mjs ./my-site
 ```
 
 Open **http://localhost:4400**, press **Alt+E** (or click **Edit page**), and click anything. Already running a dev server on, say, port 5173? Wrap it instead, and its hot reload keeps working:
 
 ```bash
-node designinside/dist/designinside.mjs --proxy 5173 ./my-site
+node design-inside/dist/design-inside.mjs --proxy 5173 ./my-site
 ```
 
 The tool is a single bundled file, so there's nothing to `npm install`. Using Claude Code? Install it as a plugin instead: see [With Claude Code](#with-claude-code).
@@ -41,6 +41,8 @@ The tool is a single bundled file, so there's nothing to `npm install`. Using Cl
 ## The panel
 
 The panel shows only the controls that fit what you clicked. A heading gets text and font controls, an image gets size with *Keep proportions*, and a card gets background, spacing and "Text inside".
+
+Put the panel wherever it suits you. Use **⇱** to dock it **left, top, center or right**, drag its top bar to place it anywhere, drag a side or bottom edge (it turns blue) or the corner to resize it, or use **–** to collapse it to its title bar. Stuck somewhere awkward? Double-click the top bar to put it back. The layout is remembered for each site, and **Reset** restores the default.
 
 | | |
 |---|---|
@@ -61,34 +63,34 @@ The panel shows only the controls that fit what you clicked. A heading gets text
 | Resize an image | Width or height, with the other side set to `auto` to keep its proportions |
 | Move an item earlier or later | The two elements, swapped in the HTML source |
 | Edit a Tailwind element | Swapped utilities: `text-slate-900 text-2xl` → `text-[#ea580c] text-[32px]` |
-| Ask for anything else ("zoom the image on hover") | A request in `.designinside/requests.md` with the element's file, selector and styles, for your AI agent |
+| Ask for anything else ("zoom the image on hover") | A request in `.design-inside/requests.md` with the element's file, selector and styles, for your AI agent |
 
 Every save is **one git commit** that touches only the files it changed. **Undo** is a `git revert`, from the toast or the History tab, and it never rewrites history.
 
 ## Use it with your AI agent
 
-The panel works without any AI. The **Ask AI** tab is for changes it can't make safely, such as layout, new sections, hover effects or React components. Your request is saved to `.designinside/requests.md` together with the element's source location and current styles, and the top of that file tells the agent exactly what to do.
+The panel works without any AI. The **Ask AI** tab is for changes it can't make safely, such as layout, new sections, hover effects or React components. Your request is saved to `.design-inside/requests.md` together with the element's source location and current styles, and the top of that file tells the agent exactly what to do.
 
 ### With Claude Code
 
 ```bash
-/plugin marketplace add musahyderr/designinside
+/plugin marketplace add musahyderr/design-inside
 ```
 
 ```bash
-/plugin install designinside@designinside
+/plugin install design-inside@design-inside
 ```
 
 Then, in your project:
 
-- `/designinside:start` finds your running dev server or HTML folder and starts the editor.
-- `/designinside:apply` applies what you queued, one commit per request, so each one can be undone from the editor.
+- `/design-inside:start` finds your running dev server or HTML folder and starts the editor.
+- `/design-inside:apply` applies what you queued, one commit per request, so each one can be undone from the editor.
 
 ### With Gemini CLI, Codex, Cursor, Copilot or any other agent
 
 Start the editor as in [Quick start](#quick-start), queue requests in the **Ask AI** tab, then tell your agent:
 
-> apply .designinside/requests.md
+> apply .design-inside/requests.md
 
 No coding agent? Click **Copy prompt** on the toast and paste it into any AI chat.
 
@@ -103,9 +105,9 @@ No coding agent? Click **Copy prompt** on the toast and paste it into any AI cha
 
 ## Verification
 
-[![check](https://github.com/musahyderr/designinside/actions/workflows/check.yml/badge.svg)](https://github.com/musahyderr/designinside/actions/workflows/check.yml)
+[![check](https://github.com/musahyderr/design-inside/actions/workflows/check.yml/badge.svg)](https://github.com/musahyderr/design-inside/actions/workflows/check.yml)
 
-Every pull request and every change to `main` runs the full test suite in CI. A branch ruleset blocks any change to `main` that doesn't pass on all four platforms below. You can re-run every check yourself with `npm run check`, and the results of every run are public in [Actions](https://github.com/musahyderr/designinside/actions/workflows/check.yml).
+Every pull request and every change to `main` runs the full test suite in CI. A branch ruleset blocks any change to `main` that doesn't pass on all four platforms below. You can re-run every check yourself with `npm run check`, and the results of every run are public in [Actions](https://github.com/musahyderr/design-inside/actions/workflows/check.yml).
 
 | Platform | Node.js | Required to merge |
 |---|---|---|
@@ -119,7 +121,7 @@ Every pull request and every change to `main` runs the full test suite in CI. A 
 | Suite | Checks | What it proves |
 |---|---|---|
 | Unit tests | 35 | Source editing (HTML, CSS, `<style>` blocks, Tailwind), Windows line endings are kept, framework text search, git history and undo, and the security rules |
-| Browser: static site | 41 | The real panel in Chromium: live preview, cascade-aware rule edits, inline edits, theme variables, fonts, Text box, reordering, undo, Ask AI queue, live reload, refusing to commit over your work, element-aware controls, outline position while scrolling |
+| Browser: static site | 56 | The real panel in Chromium: moving, docking, resizing and collapsing the panel (and saving while it is moved), live preview, cascade-aware rule edits, inline edits, theme variables, fonts, Text box, reordering, undo, Ask AI queue, live reload, refusing to commit over your work, element-aware controls, outline position while scrolling |
 | Browser: proxy mode | 9 | Wrapping a dev server: source-mapped HTML, JavaScript-rendered text, CSS rules, and hot-reload WebSocket passthrough |
 | Browser: Tailwind | 5 | Panel changes become utility-class swaps, and unrelated classes are kept |
 | Dependency audit | `npm audit` | No known vulnerabilities in runtime dependencies |
@@ -138,7 +140,7 @@ Four of these tests failed before the security fix, which shows they catch real 
 ## How it works
 
 ```
-browser ── localhost:4400 ── designinside ── (your files | your dev server on localhost)
+browser ── localhost:4400 ── design-inside ── (your files | your dev server on localhost)
    │                             │
    overlay (shadow DOM)          ├─ tags each served element with data-em="file#element-path"
    ├─ reads the live CSSOM       ├─ applies a batch of changes in memory; writes only if all succeed
@@ -169,7 +171,7 @@ Others work on the same idea in different ways:
 - [Layrr](https://github.com/narnia-sh/layrr), [PulseDev](https://www.producthunt.com/posts/pulsedev) and [Fronti](https://chromewebstore.google.com/detail/visual-editor-ai/jojjbmgmggenijlkhjeaiodfoggjcjgj) send every click-and-describe change to an AI agent.
 - [Chrome DevTools Workspaces](https://developer.chrome.com/docs/devtools/workspaces) can save CSS edits to local files.
 
-designinside aims to be small and safe: it works on any local site, makes simple edits with no AI, turns every save into an undoable git commit, works with any AI agent or none, and only ever touches your own localhost.
+design-inside aims to be small and safe: it works on any local site, makes simple edits with no AI, turns every save into an undoable git commit, works with any AI agent or none, and only ever touches your own localhost.
 
 ## Contributing
 
@@ -191,7 +193,7 @@ It runs the unit tests, rebuilds `dist/`, and then runs three browser suites, ea
 
 `dist/` is committed so the tool runs without an install, so run `npm run build` after changing `src/` or `client/`.
 
-Found a security problem? Please report it privately through [Security → Report a vulnerability](https://github.com/musahyderr/designinside/security/advisories/new) rather than in a public issue.
+Found a security problem? Please report it privately through [Security → Report a vulnerability](https://github.com/musahyderr/design-inside/security/advisories/new) rather than in a public issue.
 
 ## License
 

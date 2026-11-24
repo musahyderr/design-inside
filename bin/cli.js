@@ -4,15 +4,15 @@ import { createServer } from '../src/server.js';
 import * as G from '../src/git.js';
 
 const HELP = `
-designinside: click any element on your localhost site, change it visually,
+design-inside: click any element on your localhost site, change it visually,
 and the change is written into your source files and committed to git.
 
 Usage
-  designinside [folder]                 serve a plain HTML/CSS folder (default: .)
-  designinside --proxy 5173 [folder]    wrap a running dev server (Vite, Next, Astro, …)
+  design-inside [folder]                 serve a plain HTML/CSS folder (default: .)
+  design-inside --proxy 5173 [folder]    wrap a running dev server (Vite, Next, Astro, …)
 
 Options
-  --port <n>      port for designinside (default 4400)
+  --port <n>      port for design-inside (default 4400)
   --proxy <url>   dev server to wrap; a bare port means http://localhost:<port>
   --no-git-check  don't warn when the folder isn't a git repo
   -h, --help
@@ -40,7 +40,7 @@ const listen = (port, tries = 10) => {
   });
   server.listen(port, '127.0.0.1', async () => {
     const url = `http://localhost:${port}/`;
-    console.log(`\n  designinside  ${url}`);
+    console.log(`\n  design-inside  ${url}`);
     console.log(`  ${opt.proxy ? `wrapping     ${opt.proxy}` : 'serving     '} ${opt.proxy ? '' : root}`);
     if (opt.proxy) console.log(`  source       ${root}`);
     if (!opt.noGit && !(await G.isRepo(root))) console.log('  note         not a git repo yet; the editor will offer to turn on undo (git init)');
