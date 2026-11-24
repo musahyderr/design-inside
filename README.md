@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/musahyderr/design-inside/actions/workflows/check.yml"><img alt="check" src="https://github.com/musahyderr/design-inside/actions/workflows/check.yml/badge.svg"></a>
   <a href="#verification"><img alt="tested on Linux, macOS and Windows" src="https://img.shields.io/badge/tested%20on-Linux%20%7C%20macOS%20%7C%20Windows-informational"></a>
-  <a href="#verification"><img alt="105 checks" src="https://img.shields.io/badge/checks-35%20unit%20%2B%2070%20browser-success"></a>
+  <a href="#verification"><img alt="112 checks" src="https://img.shields.io/badge/checks-36%20unit%20%2B%2076%20browser-success"></a>
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%3E%3D22-339933">
   <img alt="works with any AI agent" src="https://img.shields.io/badge/AI%20agent-any%20(or%20none)-8b5cf6">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
@@ -61,6 +61,8 @@ Put the panel wherever it suits you. Use **⇱** to dock it **left, top, center 
 | Change a color that comes from `var(--accent)` | Your choice: the theme variable in `:root` (changes everywhere) or only this element |
 | Pick a font from the curated list | The Google Fonts `<link>`, added once, plus `font-family` with fallbacks |
 | Resize an image | Width or height, with the other side set to `auto` to keep its proportions |
+| Add effects to a card or box: shadow (Soft, Medium, Strong, Glow), opacity, gradient, border, glass blur | `box-shadow`, `opacity`, `background-image: linear-gradient(…)`, `border` and `backdrop-filter`, to the rule or just this element (Tailwind: `shadow-[…]`, `opacity-[…]`) |
+| Adjust an image: grayscale, brightness, contrast, saturation | One `filter` value, such as `grayscale(100%) contrast(120%)` |
 | Move an item earlier or later | The two elements, swapped in the HTML source |
 | Edit a Tailwind element | Swapped utilities: `text-slate-900 text-2xl` → `text-[#ea580c] text-[32px]` |
 | Ask for anything else ("zoom the image on hover") | A request in `.design-inside/requests.md` with the element's file, selector and styles, for your AI agent |
@@ -120,8 +122,8 @@ Every pull request and every change to `main` runs the full test suite in CI. A 
 
 | Suite | Checks | What it proves |
 |---|---|---|
-| Unit tests | 35 | Source editing (HTML, CSS, `<style>` blocks, Tailwind), Windows line endings are kept, framework text search, git history and undo, and the security rules |
-| Browser: static site | 56 | The real panel in Chromium: moving, docking, resizing and collapsing the panel (and saving while it is moved), live preview, cascade-aware rule edits, inline edits, theme variables, fonts, Text box, reordering, undo, Ask AI queue, live reload, refusing to commit over your work, element-aware controls, outline position while scrolling |
+| Unit tests | 36 | Source editing (HTML, CSS, `<style>` blocks, Tailwind), Windows line endings are kept, framework text search, git history and undo, and the security rules |
+| Browser: static site | 62 | The real panel in Chromium: effects (shadow, opacity, gradient, border, image filters) saved and committed, moving, docking, resizing and collapsing the panel (and saving while it is moved), live preview, cascade-aware rule edits, inline edits, theme variables, fonts, Text box, reordering, undo, Ask AI queue, live reload, refusing to commit over your work, element-aware controls, outline position while scrolling |
 | Browser: proxy mode | 9 | Wrapping a dev server: source-mapped HTML, JavaScript-rendered text, CSS rules, and hot-reload WebSocket passthrough |
 | Browser: Tailwind | 5 | Panel changes become utility-class swaps, and unrelated classes are kept |
 | Dependency audit | `npm audit` | No known vulnerabilities in runtime dependencies |

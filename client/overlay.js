@@ -737,6 +737,7 @@ import { STYLES } from './styles.js';
           </div>
           ${k.media ? `<label class="check"><input type="checkbox" class="keepratio" ${st.keepRatio !== false ? 'checked' : ''}> Keep proportions</label>` : ''}
         </section>
+        ${effectsSection(el, cs, k)}
         <section>
           <h4>Position</h4>
           <div class="row"><span>Order</span>
@@ -763,6 +764,81 @@ import { STYLES } from './styles.js';
 
     if (st.tab === 'history') loadHistory();
     renderPending();
+  }
+
+  // ---------------------------------------------------------------- effects (shadow, opacity, gradient, border, glass, image filters)
+  const SHADOWS = {
+    none: ['None', 'none'],
+    soft: ['Soft', '0 2px 8px rgba(15, 23, 42, 0.08)'],
+    medium: ['Medium', '0 8px 24px rgba(15, 23, 42, 0.14)'],
+    strong: ['Strong', '0 20px 48px rgba(15, 23, 42, 0.24)'],
+    glow: ['Glow', '0 0 0 4px rgba(139, 123, 255, 0.25), 0 8px 30px rgba(139, 123, 255, 0.35)'],
+  };
+  const FILTERS = [['grayscale', 'Grayscale', 0, 100, 0], ['brightness', 'Brightness', 0, 200, 100], ['contrast', 'Contrast', 0, 200, 100], ['saturate', 'Saturation', 0, 200, 100]];
+  // The browser rewrites shadows into its own form ("rgba(…) 0px 8px 24px 0px"), so compare
+  // the element's computed shadow with each preset as the browser computes it.
+  let computedShadows = null;
+  function shadowPresetOf(cs) {
+    if (cs.boxShadow === 'none') return 'none';
+    if (!computedShadows) {
+      const probe = document.createElement('div');
+      probe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none';
+      shadow.appendChild(probe);
+      computedShadows = Object.fromEntries(Object.entries(SHADOWS).map(([key, [, v]]) => { probe.style.boxShadow = v; return [key, getComputedStyle(probe).boxShadow]; }));
+      probe.remove();
+    }
+    return Object.keys(computedShadows).find((key) => computedShadows[key] === cs.boxShadow) || 'custom';
+  }
+  function effectsSection(el, cs, k) {
+    if (k.inline) return '';
+    const shadowNow = shadowPresetOf(cs);
+    const op = Math.round(parseFloat(cs.opacity) * 100);
+    const range = (attrs, v, max) => `<span class="range"><input type="range" min="0" max="${max}" step="5" ${attrs} value="${v}"><output>${v}%</output></span>`;
+    let rows = `
+      <label class="row"><span>Shadow</span><select data-fx="shadow">${shadowNow === 'custom' ? '<option selected disabled>Custom</option>' : ''}${Object.entries(SHADOWS).map(([key, [label]]) => `<option value="${key}" ${key === shadowNow ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+      <label class="row"><span>Opacity</span>${range('data-fx="opacity"', op, 100)}</label>`;
+    if (k.media) {
+      const now = {};
+      for (const [f, , , , d] of FILTERS) { const m = cs.filter.match(new RegExp(`${f}\\(([\\d.]+)(%?)\\)`)); now[f] = m ? Math.round(m[2] ? +m[1] : +m[1] * 100) : d; }
+      rows += FILTERS.map(([f, label, , max, d]) => `<label class="row"><span>${label}</span>${range(`data-fx="filter" data-f="${f}" data-default="${d}"`, now[f], max)}</label>`).join('');
+    } else {
+      const hasGrad = /gradient\(/.test(cs.backgroundImage);
+      rows += `
+      <div class="row"><span>Gradient</span><span class="grad">
+        <input type="color" data-fx="grad-a" value="${rgbToHex(cs.backgroundColor) || '#ffffff'}" title="From">
+        <input type="color" data-fx="grad-b" value="#8b7bff" title="To">
+        <select data-fx="grad-angle" title="Direction">${[[180, '↓'], [135, '↘'], [90, '→'], [45, '↗'], [0, '↑']].map(([a, t]) => `<option value="${a}" ${a === 135 ? 'selected' : ''}>${t}</option>`).join('')}</select>
+        <button class="mini" data-fx-apply="gradient">Apply</button>${hasGrad ? '<button class="mini" data-fx-apply="no-gradient">Remove</button>' : ''}
+      </span></div>
+      <div class="row"><span>Border</span><span class="border"><input data-fx="border-w" value="${Math.round(parseFloat(cs.borderTopWidth) || 0)}" title="Width in px"><input type="color" data-fx="border-c" value="${rgbToHex(cs.borderTopColor) || '#000000'}" title="Color"></span></div>
+      <label class="check"><input type="checkbox" data-fx="glass" ${cs.backdropFilter && cs.backdropFilter !== 'none' ? 'checked' : ''}> Glass blur behind it</label>`;
+    }
+    return `<section><h4>Effects</h4>${rows}</section>`;
+  }
+  // Stage an effect from its control. Returns true if the control was an effect control.
+  function stageEffect(t, live) {
+    const f = t.dataset && t.dataset.fx;
+    if (!f) return false;
+    const out = t.nextElementSibling && t.nextElementSibling.tagName === 'OUTPUT' ? t.nextElementSibling : null;
+    if (out) out.textContent = `${t.value}%`;
+    if (f === 'shadow' && !live) stage('box-shadow', SHADOWS[t.value][1], `shadow → ${SHADOWS[t.value][0]}`);
+    else if (f === 'opacity') stage('opacity', String(+t.value / 100), `opacity → ${t.value}%`);
+    else if (f === 'filter') {
+      const all = [...panel.querySelectorAll('[data-fx="filter"]')];
+      const css = all.filter((r) => +r.value !== +r.dataset.default).map((r) => `${r.dataset.f}(${r.value}%)`).join(' ') || 'none';
+      stage('filter', css, `filter → ${css}`);
+    } else if ((f === 'border-w' && !live) || f === 'border-c') {
+      const w = Math.max(0, parseFloat(panel.querySelector('[data-fx="border-w"]').value) || 0);
+      const c = panel.querySelector('[data-fx="border-c"]').value;
+      stage('border', w ? `${w}px solid ${c}` : 'none', w ? `border → ${w}px ${c}` : 'border → none');
+    } else if (f === 'glass' && !live) stage('backdrop-filter', t.checked ? 'blur(12px)' : 'none', `glass blur ${t.checked ? 'on' : 'off'}`);
+    return true;
+  }
+  function applyGradient(remove) {
+    if (remove) return stage('background-image', 'none', 'gradient → none');
+    const a = panel.querySelector('[data-fx="grad-a"]').value, b = panel.querySelector('[data-fx="grad-b"]').value;
+    const ang = panel.querySelector('[data-fx="grad-angle"]').value;
+    stage('background-image', `linear-gradient(${ang}deg, ${a}, ${b})`, `gradient → ${a} to ${b}`);
   }
 
   function colorInput(prop, hex, varName) {
@@ -812,6 +888,7 @@ import { STYLES } from './styles.js';
     if (b.dataset.tab) { st.tab = b.dataset.tab; return renderPanel(); }
     if (b.dataset.scope) { st.scope = b.dataset.scope; restage(); renderPanel(); positionBoxes(); return; }
     if (b.dataset.align) return stage('text-align', b.dataset.align);
+    if (b.dataset.fxApply) return applyGradient(b.dataset.fxApply === 'no-gradient');
     if (b.classList.contains('move')) return moveSel(b.dataset.dir);
     if (b.classList.contains('save')) return save();
     if (b.classList.contains('discard')) return discard();
@@ -830,12 +907,14 @@ import { STYLES } from './styles.js';
   });
   panel.addEventListener('input', (e) => {
     const t = e.target;
+    if (stageEffect(t, true)) return; // sliders and colors preview while you drag
     if (t.type === 'color') { const h = panel.querySelector(`[data-hex="${t.dataset.prop}"]`); if (h) h.value = t.value; stage(t.dataset.prop, t.value); }
   });
   panel.addEventListener('change', (e) => {
     const t = e.target;
     if (t.classList.contains('linkvar')) { st.linkVars = t.checked; restage(); return; }
     if (t.classList.contains('keepratio')) { st.keepRatio = t.checked; return; }
+    if (t.dataset.fx) { if (!/^(opacity|filter|border-c|grad-)/.test(t.dataset.fx)) stageEffect(t, false); return; }
     if (t.hasAttribute('data-text')) {
       const p = st.pending.find((x) => x.kind === 'text' && x.el === st.sel);
       stageText(st.sel, p ? p.before : st.sel.textContent, t.value);

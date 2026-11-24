@@ -19,6 +19,8 @@ const RULES = {
   margin: { test: (c) => /^m-/.test(c), make: (v) => `m-[${v.replace(/ /g, '_')}]` },
   'border-radius': { test: (c) => /^rounded(-|$)/.test(c) && !/^rounded-[trblse]{1,2}(-|$)/.test(c), make: (v) => `rounded-[${v}]` },
   gap: { test: (c) => /^gap-(?!x-|y-)/.test(c), make: (v) => `gap-[${v}]` },
+  'box-shadow': { test: (c) => /^shadow(-(none|2xs|xs|sm|md|lg|xl|2xl|inner|\[.*\]))?$/.test(c), make: (v) => (v === 'none' ? 'shadow-none' : `shadow-[${v.replace(/ /g, '_')}]`) },
+  opacity: { test: (c) => /^opacity-(\d+|\[.*\])$/.test(c), make: (v) => `opacity-[${v}]` },
 };
 
 function firstFamily(v) {

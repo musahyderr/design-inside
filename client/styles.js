@@ -54,6 +54,14 @@ header { cursor: grab; touch-action: none; }
 .edge-b::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 0; height: 3px; border-radius: 3px; background: transparent; transition: background .12s; }
 .edge-b:hover::after, .panel.resizing-b .edge-b::after { background: #3b82f6; }
 .panel.min .edge-b, .panel[data-dock="auto"] .edge-b, .panel[data-dock="left"] .edge-b, .panel[data-dock="right"] .edge-b { display: none; }
+/* effects */
+.range { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end; }
+.range input[type=range] { width: 120px; accent-color: var(--accent); padding: 0; height: auto; border: 0; background: none; }
+.range output { width: 38px; text-align: right; color: var(--dim); font: 11px ui-monospace, monospace; }
+.grad, .border { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.grad input[type=color], .border input[type=color] { width: 28px; height: 28px; padding: 2px; flex: 0 0 28px; }
+.grad select { width: 46px; }
+.border input:not([type=color]) { width: 56px; }
 /* dark scrollbars inside the panel */
 .panel, .panel * { scrollbar-width: thin; scrollbar-color: #2e2e36 #0d0d10; }
 .panel ::-webkit-scrollbar { width: 8px; height: 8px; }
