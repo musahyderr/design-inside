@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/musahyderr/design-inside/actions/workflows/check.yml"><img alt="check" src="https://github.com/musahyderr/design-inside/actions/workflows/check.yml/badge.svg"></a>
   <a href="#verification"><img alt="tested on Linux, macOS and Windows" src="https://img.shields.io/badge/tested%20on-Linux%20%7C%20macOS%20%7C%20Windows-informational"></a>
-  <a href="#verification"><img alt="147 checks" src="https://img.shields.io/badge/checks-45%20unit%20%2B%20102%20browser-success"></a>
+  <a href="#verification"><img alt="151 checks" src="https://img.shields.io/badge/checks-45%20unit%20%2B%20106%20browser-success"></a>
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%3E%3D22-339933">
   <img alt="works with any AI agent" src="https://img.shields.io/badge/AI%20agent-any%20(or%20none)-8b5cf6">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
@@ -129,7 +129,7 @@ Every pull request and every change to `main` runs the full test suite in CI. A 
 | Suite | Checks | What it proves |
 |---|---|---|
 | Unit tests | 45 | Source editing (HTML, CSS, `<style>` blocks, Tailwind), Windows line endings are kept, framework text search, git history and undo, the security rules, and image checks (formats by content, SVG and hidden code refused, 5 MB and 8000 px limits, safe file names) |
-| Browser: static site | 71 | The real panel in Chromium: folded groups for new users, matching a dark site, rubber-band dragging, the Ask AI list and removing a request, effects (shadow, opacity, gradient, border, image filters) saved and committed, moving, docking, resizing and collapsing the panel (and saving while it is moved), live preview, cascade-aware rule edits, inline edits, theme variables, fonts, Text box, reordering, undo, Ask AI queue, live reload, refusing to commit over your work, element-aware controls, outline position while scrolling |
+| Browser: static site | 75 | The real panel in Chromium: nothing spills sideways even at the narrowest width, long change lists collapse, folded groups for new users, matching a dark site, rubber-band dragging, the Ask AI list and removing a request, effects (shadow, opacity, gradient, border, image filters) saved and committed, moving, docking, resizing and collapsing the panel (and saving while it is moved), live preview, cascade-aware rule edits, inline edits, theme variables, fonts, Text box, reordering, undo, Ask AI queue, live reload, refusing to commit over your work, element-aware controls, outline position while scrolling |
 | Browser: proxy mode | 9 | Wrapping a dev server: source-mapped HTML, JavaScript-rendered text, CSS rules, and hot-reload WebSocket passthrough |
 | Browser: Tailwind | 5 | Panel changes become utility-class swaps, and unrelated classes are kept |
 | Browser: images | 17 | Replace an image and crop it, save as one commit, undo removes the file, card background images, and refusing files over 5 MB, SVGs, fake images and direct requests to the server |
