@@ -1,7 +1,7 @@
 {
-  "name": "designinside",
+  "name": "design-inside",
   "version": "0.1.0",
-  "description": "Click any element on your localhost site, change it visually, and designinside writes the change into your real source files and commits it.",
+  "description": "Click any element on your localhost site, change it visually, and design-inside writes the change into your real source files and commits it.",
   "keywords": [
     "visual-editor",
     "localhost",
@@ -13,18 +13,18 @@
     "codex",
     "localhost-only"
   ],
-  "homepage": "https://github.com/musahyderr/designinside#readme",
-  "bugs": "https://github.com/musahyderr/designinside/issues",
+  "homepage": "https://github.com/musahyderr/design-inside#readme",
+  "bugs": "https://github.com/musahyderr/design-inside/issues",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/musahyderr/designinside.git"
+    "url": "git+https://github.com/musahyderr/design-inside.git"
   },
   "license": "MIT",
-  "author": "designinside contributors",
+  "author": "design-inside contributors",
   "type": "module",
   "main": "src/server.js",
   "bin": {
-    "designinside": "dist/designinside.mjs"
+    "design-inside": "dist/design-inside.mjs"
   },
   "engines": {
     "node": ">=22"

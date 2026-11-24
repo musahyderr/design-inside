@@ -1,5 +1,5 @@
 // End-to-end: drives the real overlay in Chromium against a running
-// designinside server and checks the files on disk and the git log.
+// design-inside server and checks the files on disk and the git log.
 //   node test/e2e.cjs http://localhost:4400 /path/to/site [screenshot-dir]
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -18,7 +18,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const shot = async (name) => { if (shots) await page.screenshot({ path: path.join(shots, `${String(++n).padStart(2, '0')}-${name}.png`) }); };
-  const ui = (sel) => page.locator('designinside-root').locator(sel);
+  const ui = (sel) => page.locator('design-inside-root').locator(sel);
   const waitReload = async (fn) => { await Promise.all([page.waitForEvent('load'), fn()]); await page.waitForTimeout(400); };
 
   await page.goto(base);
@@ -49,7 +49,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await waitReload(() => ui('.save').click());
   const css = read('styles.css');
   check(/\.card \{\n  background: #fef9c3;\n  border: 1px solid #e2e8f0;\n  border-radius: var\(--radius\);\n  padding: 32px;\n\}/.test(css), 'styles.css .card rule rewritten in place, formatting kept');
-  check(log()[0].startsWith('designinside: article.card background-color: #fef9c3 (.card in styles.css)'), `commit: "${log()[0]}"`);
+  check(log()[0].startsWith('design-inside: article.card background-color: #fef9c3 (.card in styles.css)'), `commit: "${log()[0]}"`);
   const diff = execSync('git show --stat --format= HEAD', { cwd: site }).toString();
   check(/styles\.css \| 4 \+\+--/.test(diff) && !/index\.html/.test(diff), 'commit touches only styles.css, 2 lines');
   await shot('saved');
@@ -116,7 +116,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await waitReload(() => ui('.undo').first().click());
   const order2 = await page.$$eval('.card h3', (e) => e.map((x) => x.textContent));
   check(order2.join() === 'Pocket,Everyday,Studio', 'undo reverts the reorder with a revert commit');
-  check(log()[0].startsWith('Revert "designinside: move'), `history kept: "${log()[0]}"`);
+  check(log()[0].startsWith('Revert "design-inside: move'), `history kept: "${log()[0]}"`);
 
   // 9b. the panel adapts to what you click, and has a Text box
   await page.click('.lede');
@@ -130,7 +130,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   check((await page.textContent('.lede')) === 'Fast charging for every device you own.', 'Text box previews the new text on the page');
   await waitReload(() => ui('.save').click());
   check(read('index.html').includes('<p class="lede">Fast charging for every device you own.</p>'), 'Text box writes the new text to index.html');
-  check(log()[0].startsWith('designinside:'), `Text box edit is committed: "${log()[0]}"`);
+  check(log()[0].startsWith('design-inside:'), `Text box edit is committed: "${log()[0]}"`);
 
   await page.click('.hero-actions .btn');
   check((await ui('.kind').textContent()) === 'Button', 'a.btn is labelled Button');
@@ -163,7 +163,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await page.waitForTimeout(25);
   const drift = await page.evaluate(() => {
     const r = document.querySelector('.card .btn').getBoundingClientRect();
-    const boxes = [...document.querySelector('designinside-root').shadowRoot.querySelectorAll('.hl')].map((x) => x.getBoundingClientRect()).filter((x) => x.width > 0);
+    const boxes = [...document.querySelector('design-inside-root').shadowRoot.querySelectorAll('.hl')].map((x) => x.getBoundingClientRect()).filter((x) => x.width > 0);
     return Math.min(...boxes.map((x) => Math.abs(x.top - r.top)));
   });
   check(drift <= 1, `selection outline follows the element while scrolling (off by ${Math.round(drift)}px)`);
@@ -206,7 +206,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await ui('[data-hex="color"]').fill('#7c3aed');
   await ui('[data-hex="color"]').press('Enter');
   await waitReload(() => ui('.save').click());
-  check(/<h1 style="[^"]*color: #7c3aed/.test(read('index.html')) && log()[0].startsWith('designinside:'), `saving still writes and commits with the panel moved ("${log()[0]}")`);
+  check(/<h1 style="[^"]*color: #7c3aed/.test(read('index.html')) && log()[0].startsWith('design-inside:'), `saving still writes and commits with the panel moved ("${log()[0]}")`);
   await page.click('.hero h1');
   await ui('.layout-btn').click();
   await ui('.reset-layout').click();
@@ -220,9 +220,9 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await ui('.send').click();
   await page.waitForTimeout(300);
   await shot('ask-ai');
-  const q = read('.designinside/requests.md');
-  check(q.includes('## [ ]') && q.includes('lift slightly') && q.includes('index.html'), 'request queued in .designinside/requests.md with source location');
-  check(!execSync('git status --porcelain', { cwd: site }).toString().includes('.designinside'), 'queue file is git-excluded');
+  const q = read('.design-inside/requests.md');
+  check(q.includes('## [ ]') && q.includes('lift slightly') && q.includes('index.html'), 'request queued in .design-inside/requests.md with source location');
+  check(!execSync('git status --porcelain', { cwd: site }).toString().includes('.design-inside'), 'queue file is git-excluded');
 
   // 11. safety: refuse to edit a file with the user's uncommitted work
   await page.click('.logo', { position: { x: 4, y: 4 } }); // nothing pending, so live reload may run

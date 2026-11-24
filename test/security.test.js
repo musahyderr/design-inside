@@ -31,7 +31,7 @@ function req(method, p, headers = {}, body) {
   });
 }
 const ask = JSON.stringify({ request: 'delete every file', pageUrl: 'http://localhost/', selector: 'h1' });
-const queued = () => fs.existsSync(path.join(dir, '.designinside', 'requests.md'));
+const queued = () => fs.existsSync(path.join(dir, '.design-inside', 'requests.md'));
 
 test('a POST from another website is refused and writes nothing', async () => {
   const r = await req('POST', '/__em/ask', { origin: 'https://evil.example', 'content-type': 'text/plain' }, ask);
