@@ -15,6 +15,8 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
 (async () => {
   const browser = await chromium.launch(process.env.EM_BROWSER ? { channel: process.env.EM_BROWSER } : {});
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+  // these tests use controls inside the folded groups, so start with every group open
+  await page.addInitScript(() => { if (!localStorage.getItem('design-inside:folds')) localStorage.setItem('design-inside:folds', JSON.stringify({ size: true, effects: true, position: true })); });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const shot = async (name) => { if (shots) await page.screenshot({ path: path.join(shots, `${String(++n).padStart(2, '0')}-${name}.png`) }); };
@@ -209,7 +211,8 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await page.mouse.down();
   await page.mouse.move(edge2.x - 600, edge2.y + 40, { steps: 6 });
   await page.mouse.up();
-  check(Math.round((await box()).w) === 236, `the panel stops at its minimum width (${Math.round((await box()).w)}px)`);
+  await page.waitForTimeout(650); // below the minimum it stretches like rubber, then springs back
+  check(Math.round((await box()).w) === 236, `the panel springs back to its minimum width (${Math.round((await box()).w)}px)`);
   const thumb = await ui('.body').evaluate((b) => getComputedStyle(b).scrollbarColor);
   const [tr, tg, tb] = (thumb.match(/\d+(\.\d+)?/g) || []).map(Number);
   check(Math.max(tr, tg, tb) <= 70, `the panel uses a dark scrollbar (${thumb})`);
@@ -272,6 +275,36 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   const q = read('.design-inside/requests.md');
   check(q.includes('## [ ]') && q.includes('lift slightly') && q.includes('index.html'), 'request queued in .design-inside/requests.md with source location');
   check(!execSync('git status --porcelain', { cwd: site }).toString().includes('.design-inside'), 'queue file is git-excluded');
+  await page.waitForTimeout(200);
+  check((await ui('.req').count()) === 1 && (await ui('.req span').textContent()).includes('lift slightly'), 'Ask AI lists the request waiting for your AI');
+  check((await ui('[data-tab="claude"] .dot-badge').count()) === 1, 'Ask AI shows a quiet dot while a request is waiting');
+  await ui('.req-remove').click();
+  await page.waitForTimeout(300);
+  check(!/^## \[ \]/m.test(read('.design-inside/requests.md')) && (await ui('.req').count()) === 0 && (await ui('[data-tab="claude"] .dot-badge').count()) === 0, 'a queued request can be removed, and the dot goes away');
+
+  // 10b. the panel matches the site: dark glass on a dark page
+  const tone = () => page.$eval('design-inside-root', (h) => h.dataset.tone);
+  check((await tone()) === 'light', 'light site: the panel uses light glass');
+  await page.evaluate(() => { document.body.style.background = '#0b1020'; });
+  await page.waitForTimeout(100);
+  check((await tone()) === 'dark', 'dark site: the panel switches to dark glass');
+  await page.evaluate(() => { document.body.style.background = ''; });
+  await page.waitForTimeout(100);
+
+  // 10c. rubber band: dragging past the screen edge stretches, then springs back inside
+  await ui('[data-tab="style"]').click();
+  const hb = await ui('.panel header .src').boundingBox();
+  await page.mouse.move(hb.x + 20, hb.y + 4);
+  await page.mouse.down();
+  await page.mouse.move(-400, hb.y + 4, { steps: 10 });
+  const stretched = await ui('.panel').evaluate((p) => p.getBoundingClientRect().left);
+  await page.mouse.up();
+  await page.waitForTimeout(700);
+  const settled = await ui('.panel').evaluate((p) => p.getBoundingClientRect().left);
+  check(stretched < 0 && stretched > -200 && Math.abs(settled) < 2, `dragging past the edge stretches (${Math.round(stretched)}px), then springs back (${Math.round(settled)}px)`);
+  await ui('.layout-btn').click();
+  await ui('.reset-layout').click();
+  await ui('.layout-btn').click();
 
   // 11. safety: refuse to edit a file with the user's uncommitted work
   await page.click('.logo', { position: { x: 4, y: 4 } }); // nothing pending, so live reload may run
@@ -287,6 +320,23 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   check(/uncommitted changes/.test(err), 'refuses to commit over uncommitted user work');
   await shot('safety');
   execSync('git checkout -- styles.css', { cwd: site });
+
+  // 12. folds: advanced groups start closed for a new user, open on tap, and are remembered
+  const fresh = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const p2 = await fresh.newPage();
+  const ui2 = (sel) => p2.locator('design-inside-root').locator(sel);
+  await p2.goto(base); await p2.waitForTimeout(300);
+  await p2.keyboard.press('Alt+e');
+  await p2.click('.card:not(.featured)', { position: { x: 8, y: 8 } });
+  const visible = async (sel) => ui2(sel).first().isVisible();
+  check(await visible('[data-hex="background-color"]') && !(await visible('[data-prop="padding"]')) && !(await visible('[data-fx="shadow"]')) && !(await visible('.move')), 'a new user sees the essentials; Size, Effects and Position start folded');
+  await ui2('[data-fold-toggle="effects"]').click();
+  check(await visible('[data-fx="shadow"]') && !(await visible('[data-prop="padding"]')), 'tapping Effects opens just that group');
+  await p2.reload(); await p2.waitForTimeout(300);
+  if (!(await ui2('.pill.on').count())) await p2.keyboard.press('Alt+e');
+  await p2.click('.card:not(.featured)', { position: { x: 8, y: 8 } });
+  check(await visible('[data-fx="shadow"]'), 'the open group is remembered after a reload');
+  await fresh.close();
 
   check(errors.length === 0, `no page errors ${errors.join(' | ')}`);
   await browser.close();

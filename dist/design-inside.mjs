@@ -15979,6 +15979,15 @@ function createServer({ root: root3, proxy = null, log = console.log }) {
         const entry = await queueForAgent(body);
         return send(res, 200, { ok: true, ...entry });
       }
+      if (route === "requests") return send(res, 200, { requests: await openRequests() });
+      if (route === "requests-remove" && req.method === "POST") {
+        const { id } = await readJson(req);
+        if (typeof id !== "string" || !/^[a-z0-9]{1,20}$/.test(id)) return send(res, 400, { error: "Invalid request id." });
+        const removed = await removeRequest(id);
+        if (!removed) return send(res, 404, { error: "That request is no longer in the queue." });
+        log(`  \u2715 removed queued request ${id}`);
+        return send(res, 200, { ok: true, pending: await pendingCount() });
+      }
       return send(res, 404, { error: "unknown endpoint" });
     } catch (e) {
       const code = e.code && Number.isInteger(e.code) ? e.code : 500;
@@ -16005,6 +16014,35 @@ function createServer({ root: root3, proxy = null, log = console.log }) {
     } catch {
       return 0;
     }
+  }
+  const SECTION = /^## \[( |x)\] ([a-z0-9]+) — (.*)$/;
+  async function openRequests() {
+    let text = "";
+    try {
+      text = await fsp.readFile(queueFile, "utf8");
+    } catch {
+      return [];
+    }
+    return text.split("\n").map((l) => l.match(SECTION)).filter((m) => m && m[1] === " ").map((m) => ({ id: m[2], title: m[3] }));
+  }
+  async function removeRequest(id) {
+    let text;
+    try {
+      text = await fsp.readFile(queueFile, "utf8");
+    } catch {
+      return false;
+    }
+    const lines = text.split("\n");
+    const start = lines.findIndex((l) => {
+      const m = l.match(SECTION);
+      return m && m[2] === id;
+    });
+    if (start < 0) return false;
+    let end = start + 1;
+    while (end < lines.length && !/^## /.test(lines[end])) end++;
+    lines.splice(start, end - start);
+    await fsp.writeFile(queueFile, lines.join("\n"));
+    return true;
   }
   async function queueForAgent(b) {
     await fsp.mkdir(queueDir, { recursive: true });

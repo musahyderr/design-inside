@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/musahyderr/design-inside/actions/workflows/check.yml"><img alt="check" src="https://github.com/musahyderr/design-inside/actions/workflows/check.yml/badge.svg"></a>
   <a href="#verification"><img alt="tested on Linux, macOS and Windows" src="https://img.shields.io/badge/tested%20on-Linux%20%7C%20macOS%20%7C%20Windows-informational"></a>
-  <a href="#verification"><img alt="138 checks" src="https://img.shields.io/badge/checks-45%20unit%20%2B%2093%20browser-success"></a>
+  <a href="#verification"><img alt="147 checks" src="https://img.shields.io/badge/checks-45%20unit%20%2B%20102%20browser-success"></a>
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%3E%3D22-339933">
   <img alt="works with any AI agent" src="https://img.shields.io/badge/AI%20agent-any%20(or%20none)-8b5cf6">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
@@ -40,7 +40,7 @@ The tool is a single bundled file, so there's nothing to `npm install`. Using Cl
 
 ## The panel
 
-The panel shows only the controls that fit what you clicked. A heading gets text and font controls, an image gets size with *Keep proportions*, and a card gets background, spacing and "Text inside".
+The panel stays simple. It shows only the controls that fit what you clicked, and the advanced groups (Size & spacing, Effects, Position) stay folded until you tap them. A heading gets text and font controls, an image gets size with *Keep proportions*, and a card gets background, spacing and "Text inside".
 
 Replace an image or give a card a background image, crop it in the browser, and add effects such as shadows, gradients and glass blur.
 
@@ -53,7 +53,7 @@ Put the panel wherever it suits you. Use **⇱** to dock it **left, top, center 
 | ![History tab: every save is a commit with an Undo button](docs/screenshots/history.png) | ![Ask AI tab: a request is queued for an AI agent, with a Copy prompt button](docs/screenshots/ask-ai.png) |
 | **History.** Every save is a git commit with one-click **Undo**. | **Ask AI.** Anything the panel can't do goes to your AI agent, with the exact source location. |
 | ![Dark mode: the same panel as frosted dark glass](docs/screenshots/panel-dark.png) | ![Crop window: choose a shape, rotate, and see the final size](docs/screenshots/crop.png) |
-| **Light and dark.** The panel follows your computer's appearance, like an Apple app. | **Crop images.** Free, 1:1, 4:3, 16:9 or Original, with rotate. |
+| **Blends in.** Dark glass on dark sites, light glass on light ones, switching when the site changes theme. | **Crop images.** Free, 1:1, 4:3, 16:9 or Original, with rotate. |
 
 ## What it does
 
@@ -76,7 +76,7 @@ Every save is **one git commit** that touches only the files it changed. **Undo*
 
 ## Use it with your AI agent
 
-The panel works without any AI. The **Ask AI** tab is for changes it can't make safely, such as layout, new sections, hover effects or React components. Your request is saved to `.design-inside/requests.md` together with the element's source location and current styles, and the top of that file tells the agent exactly what to do.
+The panel works without any AI. The **Ask AI** tab is for changes it can't make safely, such as layout, new sections, hover effects or React components. Your request is saved to `.design-inside/requests.md` together with the element's source location and current styles, and the top of that file tells the agent exactly what to do. Queued requests are listed in the Ask AI tab until your AI applies them, and you can remove any you no longer want.
 
 ### With Claude Code
 
@@ -129,7 +129,7 @@ Every pull request and every change to `main` runs the full test suite in CI. A 
 | Suite | Checks | What it proves |
 |---|---|---|
 | Unit tests | 45 | Source editing (HTML, CSS, `<style>` blocks, Tailwind), Windows line endings are kept, framework text search, git history and undo, the security rules, and image checks (formats by content, SVG and hidden code refused, 5 MB and 8000 px limits, safe file names) |
-| Browser: static site | 62 | The real panel in Chromium: effects (shadow, opacity, gradient, border, image filters) saved and committed, moving, docking, resizing and collapsing the panel (and saving while it is moved), live preview, cascade-aware rule edits, inline edits, theme variables, fonts, Text box, reordering, undo, Ask AI queue, live reload, refusing to commit over your work, element-aware controls, outline position while scrolling |
+| Browser: static site | 71 | The real panel in Chromium: folded groups for new users, matching a dark site, rubber-band dragging, the Ask AI list and removing a request, effects (shadow, opacity, gradient, border, image filters) saved and committed, moving, docking, resizing and collapsing the panel (and saving while it is moved), live preview, cascade-aware rule edits, inline edits, theme variables, fonts, Text box, reordering, undo, Ask AI queue, live reload, refusing to commit over your work, element-aware controls, outline position while scrolling |
 | Browser: proxy mode | 9 | Wrapping a dev server: source-mapped HTML, JavaScript-rendered text, CSS rules, and hot-reload WebSocket passthrough |
 | Browser: Tailwind | 5 | Panel changes become utility-class swaps, and unrelated classes are kept |
 | Browser: images | 17 | Replace an image and crop it, save as one commit, undo removes the file, card background images, and refusing files over 5 MB, SVGs, fake images and direct requests to the server |

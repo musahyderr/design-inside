@@ -44,6 +44,27 @@ import { STYLES } from './styles.js';
   const host = document.createElement('design-inside-root');
   host.style.cssText = 'all: initial; position: fixed; inset: 0; z-index: 2147483647; pointer-events: none;';
   const shadow = host.attachShadow({ mode: 'open' });
+  // Blend in with the site: dark glass on dark pages, light glass on light pages.
+  // Read from the page's own background, and re-read when the site switches theme.
+  function pageTone() {
+    const rgb = (c) => {
+      const m = String(c).match(/rgba?\(([^)]+)\)/);
+      if (!m) return null;
+      const [r, g, b, a = 1] = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+      return a < 0.5 ? null : [r, g, b];
+    };
+    for (const el of [document.body, document.documentElement]) {
+      const c = el && rgb(getComputedStyle(el).backgroundColor);
+      if (c) return (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255 < 0.5 ? 'dark' : 'light';
+    }
+    const scheme = getComputedStyle(document.documentElement).colorScheme || '';
+    return /dark/.test(scheme) && !/light/.test(scheme) ? 'dark' : 'light'; // pages are white unless they say otherwise
+  }
+  const syncTone = () => { const t = pageTone(); if (host.dataset.tone !== t) host.dataset.tone = t; };
+  syncTone();
+  const toneWatch = new MutationObserver(syncTone);
+  for (const el of [document.documentElement, document.body]) if (el) toneWatch.observe(el, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-mode', 'data-color-scheme'] });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncTone);
   shadow.innerHTML = `<style>${STYLES}</style>
     <div class="hl hover" hidden><span class="tag"></span></div>
     <div class="hl selected" hidden><span class="tag"></span></div>
@@ -395,7 +416,8 @@ import { STYLES } from './styles.js';
         styles,
       });
       st.status.pending = (st.status.pending || 0) + 1;
-      toast(`${quiet ? 'Couldn\'t do this directly, so it\'s queued' : 'Queued'} for your AI agent: “${request}”. Ask it to apply .design-inside/requests.md (Claude Code: /design-inside:apply), or copy the prompt into any AI chat.`, {
+      if (st.tab === 'claude') renderPanel();
+      toast(`${quiet ? 'Handed to your AI' : 'Queued for your AI'}: “${request}”. It's listed in Ask AI until your AI applies it.`, {
         actions: [{ label: 'Copy prompt', run: () => navigator.clipboard.writeText(r.prompt).then(() => toast('Prompt copied')) }],
       });
       renderDockBadge();
@@ -423,10 +445,14 @@ import { STYLES } from './styles.js';
   const saveLayout = () => { try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(st.layout)); } catch { /* storage blocked */ } };
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const MIN_W = 236; // narrow enough to stay out of the way, wide enough for the controls
+  // iOS rubber band: past an edge, movement meets growing resistance instead of a hard stop.
+  const rubber = (d, dim = 160) => (1 - 1 / ((d * 0.55) / dim + 1)) * dim;
+  const stretchy = (v, lo, hi) => (v < lo ? lo - rubber(lo - v) : v > hi ? hi + rubber(v - hi) : v);
+  const fit = (v, lo, hi) => (st.stretch ? stretchy(v, lo, hi) : clamp(v, lo, hi));
   function applyLayout() {
     const L = st.layout, M = 12, s = panel.style;
-    const w = clamp(L.w, MIN_W, Math.max(MIN_W, innerWidth - 2 * M));
-    const h = clamp(L.h, 200, Math.max(200, innerHeight - 2 * M));
+    const w = fit(L.w, MIN_W, Math.max(MIN_W, innerWidth - 2 * M));
+    const h = fit(L.h, 200, Math.max(200, innerHeight - 2 * M));
     s.left = s.right = s.top = s.bottom = s.transform = s.height = '';
     s.width = `${w}px`;
     panel.classList.toggle('min', !!L.min);
@@ -443,9 +469,10 @@ import { STYLES } from './styles.js';
       s.top = '50%'; s.left = '50%'; s.transform = 'translate(-50%, -50%)';
       if (!L.min) s.height = `${h}px`;
     } else { // free: wherever it was dragged, kept on screen
-      s.left = `${clamp(L.x ?? innerWidth - w - M, 0, Math.max(0, innerWidth - w))}px`;
-      s.top = `${clamp(L.y ?? M, 0, Math.max(0, innerHeight - 48))}px`;
-      if (!L.min) s.height = `${Math.min(h, innerHeight - clamp(L.y ?? M, 0, innerHeight - 48) - M)}px`;
+      const y = fit(L.y ?? M, 0, Math.max(0, innerHeight - 48));
+      s.left = `${fit(L.x ?? innerWidth - w - M, 0, Math.max(0, innerWidth - w))}px`;
+      s.top = `${y}px`;
+      if (!L.min) s.height = `${st.stretch ? h : Math.min(h, innerHeight - y - M)}px`;
     }
   }
   function dockPanel() {
@@ -479,15 +506,17 @@ import { STYLES } from './styles.js';
     const begin = () => {
       started = true;
       if (bar) Object.assign(st.layout, { dock: 'free', x: r.left, y: r.top, w: r.width, h: st.layout.min ? st.layout.h : r.height });
+      panel.classList.remove('settle');
       panel.classList.add(bar ? 'dragging' : edgeB ? 'resizing-b' : 'resizing');
+      st.stretch = true;
     };
     if (!bar) begin();
     const move = (ev) => {
       const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
       if (!started) { if (Math.hypot(dx, dy) < 4) return; begin(); }
       if (bar) { st.layout.x = start.left + dx; st.layout.y = start.top + dy; } else {
-        if (!edgeB) st.layout.w = clamp(start.w + (anchorRight ? -dx : dx), MIN_W, innerWidth - 24);
-        if (!edge && !['auto', 'left', 'right'].includes(st.layout.dock)) st.layout.h = clamp(start.h + dy, 200, innerHeight - 24);
+        if (!edgeB) st.layout.w = start.w + (anchorRight ? -dx : dx);
+        if (!edge && !['auto', 'left', 'right'].includes(st.layout.dock)) st.layout.h = start.h + dy;
       }
       applyLayout();
     };
@@ -497,12 +526,70 @@ import { STYLES } from './styles.js';
       removeEventListener('pointerup', up, true);
       removeEventListener('pointercancel', up, true);
       panel.classList.remove('dragging', 'resizing', 'resizing-b');
-      if (started) saveLayout();
+      if (!started) return;
+      // let go: spring back inside the screen and the size limits
+      st.stretch = false;
+      const L = st.layout;
+      L.w = clamp(L.w, MIN_W, Math.max(MIN_W, innerWidth - 24));
+      L.h = clamp(L.h, 200, Math.max(200, innerHeight - 24));
+      if (L.dock === 'free') { L.x = clamp(L.x, 0, Math.max(0, innerWidth - L.w)); L.y = clamp(L.y, 0, Math.max(0, innerHeight - 48)); }
+      panel.classList.add('settle');
+      applyLayout();
+      setTimeout(() => panel.classList.remove('settle'), 520);
+      saveLayout();
     };
     addEventListener('pointermove', move, true);
     addEventListener('pointerup', up, true);
     addEventListener('pointercancel', up, true);
   });
+  // Keep the panel short: advanced groups fold away behind a tap-to-open header (remembered).
+  const FOLDS = { 'Size & spacing': 'size', Effects: 'effects', Position: 'position' };
+  const FOLDS_KEY = 'design-inside:folds';
+  st.folds = (() => { try { return JSON.parse(localStorage.getItem(FOLDS_KEY) || '{}'); } catch { return {}; } })();
+  function applyFolds() {
+    for (const h of panel.querySelectorAll('.body section > h4')) {
+      const key = FOLDS[h.textContent.trim()];
+      if (!key) continue;
+      const open = !!st.folds[key];
+      h.parentElement.classList.add('fold');
+      h.parentElement.classList.toggle('open', open);
+      h.innerHTML = `<button class="fold-btn" data-fold-toggle="${key}" aria-expanded="${open}">${esc(h.textContent.trim())}<i class="chev"></i></button>`;
+    }
+  }
+  function toggleFold(key) {
+    st.folds[key] = !st.folds[key];
+    try { localStorage.setItem(FOLDS_KEY, JSON.stringify(st.folds)); } catch { /* storage blocked */ }
+    const btn = panel.querySelector(`[data-fold-toggle="${key}"]`);
+    if (btn) { btn.closest('section').classList.toggle('open', st.folds[key]); btn.setAttribute('aria-expanded', String(st.folds[key])); }
+  }
+  // Segmented controls: a pill that springs from the old choice to the new one.
+  const pillAt = {};
+  function slidePill(sel, idx, key) {
+    const pill = panel.querySelector(`${sel} .seg-pill`);
+    if (!pill || idx < 0) { delete pillAt[key]; return; }
+    const from = pillAt[key];
+    if (from != null && from !== idx) {
+      pill.style.transition = 'none';
+      pill.style.setProperty('--i', from);
+      void pill.offsetWidth;
+      pill.style.transition = '';
+    }
+    pill.style.setProperty('--i', idx);
+    pillAt[key] = idx;
+  }
+  // Scroll past the top or bottom of the panel: it stretches and bounces back, like iOS.
+  const bounce = { d: 0, t: 0 };
+  panel.addEventListener('wheel', (e) => {
+    const b = e.target.closest('.body');
+    if (!b) return;
+    const top = b.scrollTop <= 0 && e.deltaY < 0, end = b.scrollTop + b.clientHeight >= b.scrollHeight - 1 && e.deltaY > 0;
+    if (!top && !end) return;
+    bounce.d = clamp(bounce.d - e.deltaY, -600, 600);
+    b.style.transition = 'none';
+    b.style.translate = `0 ${Math.sign(bounce.d) * rubber(Math.abs(bounce.d), 120)}px`;
+    clearTimeout(bounce.t);
+    bounce.t = setTimeout(() => { b.style.transition = 'translate .55s cubic-bezier(.2, .9, .3, 1.12)'; b.style.translate = '0 0'; bounce.d = 0; }, 80);
+  }, { passive: true });
   function positionBoxes() {
     dockPanel();
     place(hoverBox, st.on && st.hover && st.hover !== st.sel ? st.hover : null);
@@ -652,7 +739,7 @@ import { STYLES } from './styles.js';
   function renderPanel() {
     const el = st.sel;
     if (!el || !st.on) { panel.hidden = true; return; }
-    panel.hidden = false;
+    if (panel.hidden) { panel.hidden = false; panel.classList.remove('enter'); void panel.offsetWidth; panel.classList.add('enter'); }
     const cs = getComputedStyle(el);
     const loc = locOf(el);
     const sel = primarySelector(el);
@@ -689,29 +776,25 @@ import { STYLES } from './styles.js';
         <button class="mini reset-layout" title="Back to the default position and size">Reset</button>
         <p class="hint">Or drag this top bar to put the panel anywhere, and double-click it to put the panel back. Drag a blue edge or the corner to resize it.</p>
       </div>` : ''}
-      <nav class="tabs">
+      <nav class="tabs"><span class="seg-pill"></span>
         <button data-tab="style" class="${st.tab === 'style' ? 'on' : ''}">Design</button>
-        <button data-tab="claude" class="${st.tab === 'claude' ? 'on' : ''}">Ask AI${st.status.pending ? ` <b>${st.status.pending}</b>` : ''}</button>
+        <button data-tab="claude" class="${st.tab === 'claude' ? 'on' : ''}">Ask AI${st.status.pending ? `<i class="dot-badge" title="${st.status.pending} waiting for your AI"></i>` : ''}</button>
         <button data-tab="history" class="${st.tab === 'history' ? 'on' : ''}">History</button>
       </nav>
       ${!st.status.git ? `<div class="warn">Undo needs git, and this folder isn't a repository yet. <button class="mini gitinit">Turn on undo</button></div>` : ''}
       <div class="body">
       ${st.tab === 'style' ? `
-        ${count > 1 || tw ? `<div class="scope">
+        ${count > 1 || tw ? `<div class="scope"><span class="seg-pill"></span>
           <button data-scope="this" class="${st.scope === 'this' ? 'on' : ''}">Just this one</button>
           <button data-scope="all" class="${st.scope === 'all' ? 'on' : ''}">All ${count} ${esc(sel || 'like it')}</button>
         </div>` : ''}
         ${k.leaf ? `<section>
           <h4>Text</h4>
           <textarea class="txt" data-text rows="${Math.min(4, Math.ceil(el.textContent.trim().length / 32) || 1)}" spellcheck="true">${esc(el.textContent.replace(/\s+/g, ' ').trim())}</textarea>
-          <p class="hint">Press Enter or click away to apply. You can also double-click the text on the page.</p>
-        </section>` : k.hasText && k.container ? `<section>
-          <h4>Text</h4>
-          <p class="hint">This ${esc(k.label.toLowerCase())} holds several pieces of text. Click one to rewrite it, or use ↖ to go up a level.</p>
-        </section>` : ''}
+          <p class="hint">Press Enter to apply.</p>
+        </section>` : k.hasText && k.container ? `<p class="lead">To change the words, click the piece of text itself.</p>` : ''}
         ${k.hasText ? `<section>
           <h4>${k.container ? 'Text inside' : 'Font & color'}</h4>
-          ${k.container ? `<p class="hint">Changes the text style of everything inside, unless a piece sets its own.</p>` : ''}
           <label class="row"><span>Font</span><select data-prop="font-family">${FONTS.map((f) => `<option value="${esc(f.name)}" ${f.name === famNow ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}${FONTS.some((f) => f.name === famNow) ? '' : `<option selected disabled>${esc(famNow)}</option>`}</select></label>
           <div class="grid2">
             <label class="row"><span>Size</span><input data-prop="font-size" value="${esc(current(el, 'font-size') || cs.fontSize)}"></label>
@@ -738,7 +821,7 @@ import { STYLES } from './styles.js';
           </div>
           ${k.media ? `<label class="check"><input type="checkbox" class="keepratio" ${st.keepRatio !== false ? 'checked' : ''}> Keep proportions</label>` : ''}
         </section>
-        ${k.tag === 'img' ? `<section><h4>Image</h4>${loc ? `<button class="mini pick-image" data-target="img-src">Replace image…</button>` : '<p class="hint">This image is rendered by your framework. Ask AI to replace it.</p>'}<p class="hint">PNG, JPEG, WebP, GIF or AVIF, up to 5 MB. You crop it before anything is saved.</p></section>` : ''}
+        ${k.tag === 'img' ? `<section><h4>Image</h4>${loc ? `<button class="mini pick-image" data-target="img-src">Replace image…</button>` : '<p class="hint">This image is rendered by your framework. Ask AI to replace it.</p>'}<p class="hint">PNG, JPEG, WebP, GIF or AVIF, up to 5 MB.</p></section>` : ''}
         ${effectsSection(el, cs, k)}
         <section>
           <h4>Position</h4>
@@ -753,9 +836,13 @@ import { STYLES } from './styles.js';
       ` : st.tab === 'claude' ? `
         <section>
           <h4>Describe a change</h4>
-          <p class="hint">For anything the panel can't do (layout, new sections, hover effects, React components). It's queued in <code>.design-inside/requests.md</code> with this element's source location and styles. Then ask your AI coding agent (Claude Code, Gemini CLI, Codex, Cursor…) to "apply .design-inside/requests.md"; in Claude Code that's <code>/design-inside:apply</code>.</p>
           <textarea class="ask" placeholder="e.g. make this card's image zoom slightly on hover"></textarea>
           <button class="primary send">Queue for AI</button>
+          <p class="hint">For anything the panel can't do, like layout, new sections or hover effects. Then tell your AI coding agent “apply .design-inside/requests.md” (in Claude Code: <code>/design-inside:apply</code>).</p>
+        </section>
+        <section class="queue">
+          <h4>Waiting for your AI</h4>
+          <div class="reqs"><p class="hint">Loading…</p></div>
         </section>
       ` : `<section class="history"><h4>Recent commits</h4><div class="hist">Loading…</div></section>`}
       </div>
@@ -764,7 +851,11 @@ import { STYLES } from './styles.js';
       <div class="edge-b" title="Drag to make the panel taller or shorter"></div>
       <div class="grip" title="Drag to resize"></div>`;
 
+    applyFolds();
+    slidePill('.tabs', ['style', 'claude', 'history'].indexOf(st.tab), 'tab');
+    slidePill('.scope', st.scope === 'all' ? 1 : 0, 'scope');
     if (st.tab === 'history') loadHistory();
+    if (st.tab === 'claude') loadRequests();
     renderPending();
   }
 
@@ -968,6 +1059,22 @@ import { STYLES } from './styles.js';
     return `<span class="color"><input type="color" data-prop="${prop}" value="${hex || '#ffffff'}"><input class="hex" data-hex="${prop}" value="${hex || 'none'}" spellcheck="false">${varName ? `<label class="var" title="This color comes from a theme variable"><input type="checkbox" class="linkvar" ${st.linkVars ? 'checked' : ''}> ${esc(varName)}</label>` : ''}</span>`;
   }
 
+  async function loadRequests() {
+    const box = panel.querySelector('.reqs');
+    if (!box) return;
+    try {
+      const { requests } = await call('requests');
+      st.status.pending = requests.length;
+      box.innerHTML = requests.length ? requests.map((r) => `
+        <div class="req"><span>${esc(r.title)}</span><button class="ghost req-remove" data-id="${esc(r.id)}" title="Remove from the queue">✕</button></div>`).join('')
+        : '<p class="hint">Nothing waiting. Requests you queue appear here until your AI applies them.</p>';
+      const tab = panel.querySelector('[data-tab="claude"]');
+      if (tab) tab.innerHTML = `Ask AI${requests.length ? `<i class="dot-badge" title="${requests.length} waiting for your AI"></i>` : ''}`;
+    } catch (e) { box.textContent = e.message; }
+  }
+  async function removeRequest(id) {
+    try { const r = await call('requests-remove', { id }); st.status.pending = r.pending; loadRequests(); } catch (e) { toast(e.message, { kind: 'error' }); loadRequests(); }
+  }
   async function loadHistory() {
     const box = panel.querySelector('.hist');
     try {
@@ -985,7 +1092,7 @@ import { STYLES } from './styles.js';
     renderDockBadge();
     if (!foot) return;
     if (!st.pending.length) {
-      foot.innerHTML = `<p class="hint">Changes preview live. Nothing is written until you save.</p>`;
+      foot.innerHTML = `<p class="hint">Changes show live. Nothing is saved until you press Save.</p>`;
       return;
     }
     foot.innerHTML = `
@@ -1003,6 +1110,7 @@ import { STYLES } from './styles.js';
     const b = e.target.closest('button');
     if (!b) return;
     if (b.classList.contains('close')) return pick(null);
+    if (b.dataset.foldToggle) return toggleFold(b.dataset.foldToggle);
     if (b.classList.contains('layout-btn')) { st.layoutOpen = !st.layoutOpen; return renderPanel(); }
     if (b.classList.contains('min-btn')) { st.layout.min = !st.layout.min; saveLayout(); renderPanel(); return applyLayout(); }
     if (b.dataset.dock) { st.layout.dock = b.dataset.dock; st.layout.min = false; saveLayout(); renderPanel(); return applyLayout(); }
@@ -1023,6 +1131,7 @@ import { STYLES } from './styles.js';
       return renderPending();
     }
     if (b.classList.contains('undo')) return undo(b.dataset.sha);
+    if (b.classList.contains('req-remove')) return removeRequest(b.dataset.id);
     if (b.classList.contains('gitinit')) return call('git-init', {}).then(() => { st.status.git = true; renderPanel(); toast('Git is on. Every save is now a commit you can undo.'); });
     if (b.classList.contains('send')) {
       const t = panel.querySelector('.ask').value.trim();
