@@ -194,6 +194,20 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await page.mouse.up();
   const sized = await box();
   check(Math.abs(sized.w - (moved.w + 80)) < 3 && Math.abs(sized.h - (moved.h - 100)) < 3, `panel can be resized from its corner (${Math.round(sized.w)}×${Math.round(sized.h)})`);
+  const edgeBox = await ui('.edge').boundingBox();
+  await page.mouse.move(edgeBox.x + 4, edgeBox.y + edgeBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(edgeBox.x - 116, edgeBox.y + edgeBox.height / 2, { steps: 6 });
+  await page.mouse.up();
+  const narrowed = await box();
+  check(Math.abs(narrowed.w - (sized.w - 120)) < 3 && Math.abs(narrowed.h - sized.h) < 3, `the side edge makes the panel narrower (${Math.round(sized.w)} → ${Math.round(narrowed.w)}px)`);
+  const edge2 = await ui('.edge').boundingBox();
+  await page.mouse.move(edge2.x + 4, edge2.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(edge2.x - 600, edge2.y + 40, { steps: 6 });
+  await page.mouse.up();
+  check(Math.round((await box()).w) === 236, `the panel stops at its minimum width (${Math.round((await box()).w)}px)`);
+  check((await ui('.body').evaluate((b) => getComputedStyle(b).scrollbarColor)).includes('rgb(46, 46, 54)'), 'the panel uses a dark scrollbar');
   await ui('.min-btn').click();
   check(!(await ui('.body').isVisible()) && (await box()).h < 120, 'panel collapses to its top bar');
   await ui('.min-btn').click();
@@ -202,7 +216,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   if (!(await ui('.pill.on').count())) await page.keyboard.press('Alt+e'); // editing mode itself survives reloads
   await page.click('.hero h1');
   const kept = await box();
-  check(Math.abs(kept.l - sized.l) < 3 && Math.abs(kept.w - sized.w) < 3, 'panel position and size are remembered after a reload');
+  check(Math.abs(kept.l - sized.l) < 3 && Math.round(kept.w) === 236, 'panel position and size are remembered after a reload');
   await ui('[data-hex="color"]').fill('#7c3aed');
   await ui('[data-hex="color"]').press('Enter');
   await waitReload(() => ui('.save').click());

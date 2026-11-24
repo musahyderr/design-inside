@@ -30,6 +30,7 @@ code { font: 11px ui-monospace, SFMono-Regular, monospace; background: var(--bg3
 /* layout: position and size are set inline by applyLayout() */
 header { cursor: grab; touch-action: none; }
 .panel.dragging, .panel.dragging * { cursor: grabbing !important; user-select: none; }
+.panel.resizing, .panel.resizing * { user-select: none; }
 .hd-actions { display: flex; gap: 2px; flex: 0 0 auto; }
 .hd-actions .ghost { width: 26px; height: 26px; padding: 0; }
 .hd-actions .on { color: var(--accent); }
@@ -40,6 +41,19 @@ header { cursor: grab; touch-action: none; }
 .grip { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; touch-action: none;
   background: linear-gradient(135deg, transparent 50%, var(--line) 50%, var(--line) 60%, transparent 60%, transparent 70%, var(--line) 70%, var(--line) 80%, transparent 80%); }
 .panel.anchor-right .grip { right: auto; left: 0; cursor: nesw-resize; transform: scaleX(-1); }
+/* resize edge: a thin line along the inner side that lights up blue */
+.edge { position: absolute; top: 0; bottom: 18px; right: 0; width: 8px; cursor: ew-resize; touch-action: none; z-index: 2; }
+.edge::after { content: ''; position: absolute; top: 10px; bottom: 10px; right: 0; width: 3px; border-radius: 3px; background: transparent; transition: background .12s; }
+.edge:hover::after, .panel.resizing .edge::after { background: #3b82f6; }
+.panel.anchor-right .edge { right: auto; left: 0; }
+.panel.anchor-right .edge::after { right: auto; left: 0; }
+.panel.min .edge { display: none; }
+/* dark scrollbars inside the panel */
+.panel, .panel * { scrollbar-width: thin; scrollbar-color: #2e2e36 #0d0d10; }
+.panel ::-webkit-scrollbar { width: 8px; height: 8px; }
+.panel ::-webkit-scrollbar-track { background: #0d0d10; }
+.panel ::-webkit-scrollbar-thumb { background: #2e2e36; border-radius: 8px; border: 2px solid #0d0d10; }
+.panel ::-webkit-scrollbar-thumb:hover { background: #45454f; }
 .panel[hidden], .hl[hidden] { display: none; }
 .panel.busy { opacity: .6; pointer-events: none; }
 header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 14px 14px 10px; }

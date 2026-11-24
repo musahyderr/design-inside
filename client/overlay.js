@@ -422,9 +422,10 @@ import { STYLES } from './styles.js';
   })();
   const saveLayout = () => { try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(st.layout)); } catch { /* storage blocked */ } };
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const MIN_W = 236; // narrow enough to stay out of the way, wide enough for the controls
   function applyLayout() {
     const L = st.layout, M = 12, s = panel.style;
-    const w = clamp(L.w, 260, Math.max(260, innerWidth - 2 * M));
+    const w = clamp(L.w, MIN_W, Math.max(MIN_W, innerWidth - 2 * M));
     const h = clamp(L.h, 200, Math.max(200, innerHeight - 2 * M));
     s.left = s.right = s.top = s.bottom = s.transform = s.height = '';
     s.width = `${w}px`;
@@ -458,7 +459,8 @@ import { STYLES } from './styles.js';
   }
   // drag the top bar to move, drag the corner to resize
   panel.addEventListener('pointerdown', (e) => {
-    const grip = e.target.closest('.grip');
+    const edge = e.target.closest('.edge');
+    const grip = e.target.closest('.grip') || edge;
     const bar = !grip && e.target.closest('header') && !e.target.closest('button, input, select, textarea');
     if (!grip && !bar) return;
     e.preventDefault();
@@ -467,18 +469,18 @@ import { STYLES } from './styles.js';
     const anchorRight = panel.classList.contains('anchor-right');
     if (bar) Object.assign(st.layout, { dock: 'free', x: r.left, y: r.top, w: r.width, h: st.layout.min ? st.layout.h : r.height });
     panel.setPointerCapture(e.pointerId);
-    panel.classList.add('dragging');
+    panel.classList.add(bar ? 'dragging' : 'resizing');
     const move = (ev) => {
       const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
       if (bar) { st.layout.x = start.left + dx; st.layout.y = start.top + dy; } else {
-        st.layout.w = clamp(start.w + (anchorRight ? -dx : dx), 260, innerWidth - 24);
-        if (!['auto', 'left', 'right'].includes(st.layout.dock)) st.layout.h = clamp(start.h + dy, 200, innerHeight - 24);
+        st.layout.w = clamp(start.w + (anchorRight ? -dx : dx), MIN_W, innerWidth - 24);
+        if (!edge && !['auto', 'left', 'right'].includes(st.layout.dock)) st.layout.h = clamp(start.h + dy, 200, innerHeight - 24);
       }
       applyLayout();
     };
     const up = () => {
       panel.removeEventListener('pointermove', move);
-      panel.classList.remove('dragging');
+      panel.classList.remove('dragging', 'resizing');
       saveLayout();
     };
     panel.addEventListener('pointermove', move);
@@ -669,7 +671,7 @@ import { STYLES } from './styles.js';
       ${st.layoutOpen ? `<div class="layout-row">
         <div class="seg">${[['left', '◧ Left'], ['top', '⬒ Top'], ['center', '▣ Center'], ['right', '◨ Right']].map(([d, t]) => `<button data-dock="${d}" class="${st.layout.dock === d ? 'on' : ''}">${t}</button>`).join('')}</div>
         <button class="mini reset-layout" title="Back to the default position and size">Reset</button>
-        <p class="hint">Or drag this top bar to put the panel anywhere, and drag its corner to resize it.</p>
+        <p class="hint">Or drag this top bar to put the panel anywhere. Drag its side edge (it turns blue) to make it narrower or wider, or its corner to resize it.</p>
       </div>` : ''}
       <nav class="tabs">
         <button data-tab="style" class="${st.tab === 'style' ? 'on' : ''}">Design</button>
@@ -739,6 +741,7 @@ import { STYLES } from './styles.js';
       ` : `<section class="history"><h4>Recent commits</h4><div class="hist">Loading…</div></section>`}
       </div>
       <footer class="pending"></footer>
+      <div class="edge" title="Drag to make the panel wider or narrower"></div>
       <div class="grip" title="Drag to resize"></div>`;
 
     if (st.tab === 'history') loadHistory();
