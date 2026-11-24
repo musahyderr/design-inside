@@ -25,9 +25,21 @@ code { font: 11px ui-monospace, SFMono-Regular, monospace; background: var(--bg3
 .pill.on .dot { background: var(--accent); box-shadow: 0 0 0 4px rgba(139,123,255,.25); }
 .pill:hover { border-color: var(--accent); }
 
-.panel { position: fixed; top: 12px; right: 12px; bottom: 12px; width: 312px; max-width: calc(100vw - 24px); pointer-events: auto; display: flex; flex-direction: column;
+.panel { position: fixed; top: 12px; right: 12px; width: 312px; max-width: calc(100vw - 24px); max-height: calc(100vh - 24px); pointer-events: auto; display: flex; flex-direction: column;
   background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.45); font-size: 12.5px; overflow: hidden; }
-.panel.left { right: auto; left: 12px; }
+/* layout: position and size are set inline by applyLayout() */
+header { cursor: grab; touch-action: none; }
+.panel.dragging, .panel.dragging * { cursor: grabbing !important; user-select: none; }
+.hd-actions { display: flex; gap: 2px; flex: 0 0 auto; }
+.hd-actions .ghost { width: 26px; height: 26px; padding: 0; }
+.hd-actions .on { color: var(--accent); }
+.layout-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 14px 10px; }
+.layout-row .seg button { padding: 4px 8px; }
+.layout-row .hint { margin: 0; width: 100%; }
+.panel.min .tabs, .panel.min .body, .panel.min footer, .panel.min .warn, .panel.min .grip, .panel.min .layout-row { display: none; }
+.grip { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; touch-action: none;
+  background: linear-gradient(135deg, transparent 50%, var(--line) 50%, var(--line) 60%, transparent 60%, transparent 70%, var(--line) 70%, var(--line) 80%, transparent 80%); }
+.panel.anchor-right .grip { right: auto; left: 0; cursor: nesw-resize; transform: scaleX(-1); }
 .panel[hidden], .hl[hidden] { display: none; }
 .panel.busy { opacity: .6; pointer-events: none; }
 header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 14px 14px 10px; }

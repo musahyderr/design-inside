@@ -103,7 +103,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
 
   // 8. reorder: move the Studio card earlier
   await page.click('.card:nth-child(3)', { position: { x: 8, y: 8 } });
-  check(await ui('.panel.left').count() === 1, 'panel docks left so it doesn\'t cover the selected card');
+  check((await ui('.panel').evaluate((p) => p.getBoundingClientRect().left)) < 50, 'panel docks left so it doesn\'t cover the selected card');
   await waitReload(() => ui('.move[data-dir="up"]').click());
   const order = await page.$$eval('.card h3', (e) => e.map((x) => x.textContent));
   check(order.join() === 'Pocket,Studio,Everyday', `cards reordered in the source: ${order.join(', ')}`);
@@ -167,6 +167,51 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
     return Math.min(...boxes.map((x) => Math.abs(x.top - r.top)));
   });
   check(drift <= 1, `selection outline follows the element while scrolling (off by ${Math.round(drift)}px)`);
+
+  // 9d. the panel can be docked, dragged, resized and collapsed, and still saves
+  const box = () => ui('.panel').evaluate((p) => { const r = p.getBoundingClientRect(); return { l: r.left, t: r.top, w: r.width, h: r.height, cx: r.left + r.width / 2 }; });
+  await page.click('.hero h1');
+  await ui('.layout-btn').click();
+  await ui('[data-dock="left"]').click();
+  check((await box()).l <= 20, 'panel docks to the left');
+  await ui('[data-dock="center"]').click();
+  const c = await box();
+  check(Math.abs(c.cx - 720) < 4, `panel docks to the center (center at ${Math.round(c.cx)}px of 1440)`);
+  await ui('[data-dock="top"]').click();
+  check((await box()).t <= 20, 'panel docks to the top');
+  const head = await ui('.panel header .src').boundingBox();
+  const before = await box();
+  await page.mouse.move(head.x + 20, head.y + 4);
+  await page.mouse.down();
+  await page.mouse.move(head.x - 180, head.y + 124, { steps: 6 });
+  await page.mouse.up();
+  const moved = await box();
+  check(Math.abs(moved.l - (before.l - 200)) < 3 && Math.abs(moved.t - (before.t + 120)) < 3, `panel can be dragged anywhere by its top bar (moved ${Math.round(moved.l - before.l)}, ${Math.round(moved.t - before.t)})`);
+  const grip = await ui('.grip').boundingBox();
+  await page.mouse.move(grip.x + 8, grip.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + 88, grip.y - 92, { steps: 6 });
+  await page.mouse.up();
+  const sized = await box();
+  check(Math.abs(sized.w - (moved.w + 80)) < 3 && Math.abs(sized.h - (moved.h - 100)) < 3, `panel can be resized from its corner (${Math.round(sized.w)}×${Math.round(sized.h)})`);
+  await ui('.min-btn').click();
+  check(!(await ui('.body').isVisible()) && (await box()).h < 120, 'panel collapses to its top bar');
+  await ui('.min-btn').click();
+  check(await ui('.body').isVisible(), 'panel expands again');
+  await page.reload(); await page.waitForTimeout(300);
+  if (!(await ui('.pill.on').count())) await page.keyboard.press('Alt+e'); // editing mode itself survives reloads
+  await page.click('.hero h1');
+  const kept = await box();
+  check(Math.abs(kept.l - sized.l) < 3 && Math.abs(kept.w - sized.w) < 3, 'panel position and size are remembered after a reload');
+  await ui('[data-hex="color"]').fill('#7c3aed');
+  await ui('[data-hex="color"]').press('Enter');
+  await waitReload(() => ui('.save').click());
+  check(/<h1 style="[^"]*color: #7c3aed/.test(read('index.html')) && log()[0].startsWith('designinside:'), `saving still writes and commits with the panel moved ("${log()[0]}")`);
+  await page.click('.hero h1');
+  await ui('.layout-btn').click();
+  await ui('.reset-layout').click();
+  check((await box()).l > 1000, 'Reset puts the panel back on the right');
+  await page.click('.logo', { position: { x: 4, y: 4 } });
 
   // 10. ask AI for something the panel can't do
   await page.click('.card.featured', { position: { x: 8, y: 8 } });
