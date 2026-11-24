@@ -41,11 +41,14 @@ node test/fixtures/devserver.cjs "$APP" 4496 & PIDS+=($!)
 node dist/design-inside.mjs --proxy 4496 "$APP" --port 4495 >/dev/null 2>&1 & PIDS+=($!)
 copy test/fixtures/tailwind-site; TW="$COPY"
 node dist/design-inside.mjs "$TW" --port 4494 >/dev/null 2>&1 & PIDS+=($!)
+copy test/fixtures/image-site; IMG="$COPY"
+node dist/design-inside.mjs "$IMG" --port 4490 >/dev/null 2>&1 & PIDS+=($!)
 sleep 1.5
 
 suite "static site" test/e2e.cjs http://localhost:4499 "$SITE"
 suite "proxy mode" test/e2e-proxy.cjs http://localhost:4495 "$APP"
 suite "tailwind" test/e2e-tailwind.cjs http://localhost:4494 "$TW"
+suite "images" test/e2e-images.cjs http://localhost:4490 "$IMG"
 echo "total: $TOTAL_PASS passed, $TOTAL_FAIL failed"
 [ "$TOTAL_FAIL" = 0 ] || exit 1
 echo "== OK"

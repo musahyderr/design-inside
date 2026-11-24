@@ -328,7 +328,7 @@ import { STYLES } from './styles.js';
     for (const p of ok) {
       const what = describe(p.el);
       const dest = p.change && p.change.kind === 'css-var' ? ` (theme ${p.change.name})` : p.change && /css-/.test(p.change.kind) ? ` (${p.change.selector} in ${p.change.sheet.label})` : p.changes ? ` (${p.changes.length} elements)` : '';
-      for (const c of p.changes || [p.change]) changes.push({ prop: p.prop, value: p.value, ...c, label: p.kind === 'text' ? p.label : `${what} ${p.label}${dest}` });
+      for (const c of p.changes || [p.change]) changes.push({ prop: p.prop, value: p.value, ...c, label: p.kind === 'text' || p.kind === 'image' ? p.label : `${what} ${p.label}${dest}` });
       if (p.prop === 'font-family') {
         const f = FONTS.find((x) => x.css === p.value);
         if (f && f.google !== false) changes.unshift({ kind: 'font-link', file: pageFile() || 'index.html', family: f.name, optional: true, label: `load ${f.name}` });
@@ -365,7 +365,7 @@ import { STYLES } from './styles.js';
     }
   }
   function discard() {
-    for (const p of st.pending) unpreview(p);
+    for (const p of st.pending) { unpreview(p); if (p.undoPreview) p.undoPreview(); }
     st.pending = [];
     renderPending();
     if (st.sel) renderPanel();
@@ -723,6 +723,7 @@ import { STYLES } from './styles.js';
         <section>
           <h4>${k.media ? 'Shape' : 'Fill & shape'}</h4>
           ${k.media ? '' : `<label class="row"><span>Background</span>${colorInput('background-color', rgbToHex(cs.backgroundColor), varOf(bgVal))}</label>`}
+          ${!k.media && loc ? `<div class="row"><span>Image</span><button class="mini pick-image" data-target="bg-image">Background image…</button></div>` : ''}
           <label class="row"><span>Corners</span><input data-prop="border-radius" value="${esc(current(el, 'border-radius') || cs.borderRadius)}"></label>
         </section>
         <section>
@@ -737,6 +738,7 @@ import { STYLES } from './styles.js';
           </div>
           ${k.media ? `<label class="check"><input type="checkbox" class="keepratio" ${st.keepRatio !== false ? 'checked' : ''}> Keep proportions</label>` : ''}
         </section>
+        ${k.tag === 'img' ? `<section><h4>Image</h4>${loc ? `<button class="mini pick-image" data-target="img-src">Replace image…</button>` : '<p class="hint">This image is rendered by your framework. Ask AI to replace it.</p>'}<p class="hint">PNG, JPEG, WebP, GIF or AVIF, up to 5 MB. You crop it before anything is saved.</p></section>` : ''}
         ${effectsSection(el, cs, k)}
         <section>
           <h4>Position</h4>
@@ -841,6 +843,127 @@ import { STYLES } from './styles.js';
     stage('background-image', `linear-gradient(${ang}deg, ${a}, ${b})`, `gradient → ${a} to ${b}`);
   }
 
+  // ---------------------------------------------------------------- image import + crop
+  // Checked here for a friendly message, and again on the server, which is the real gate.
+  const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif'];
+  const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+  const IMAGE_MAX_SIDE = 8000; // larger pictures are refused (they can freeze the browser)
+  const IMAGE_OUT_SIDE = 2400; // crops are saved at most this big: plenty for a website
+  const filePick = Object.assign(document.createElement('input'), { type: 'file', accept: IMAGE_TYPES.join(','), hidden: true });
+  shadow.appendChild(filePick);
+  let pickTarget = null;
+  function pickImage(target) { pickTarget = { kind: target, el: st.sel }; filePick.value = ''; filePick.click(); }
+  filePick.addEventListener('change', () => { const f = filePick.files && filePick.files[0]; if (f && pickTarget) importImage(f, pickTarget); });
+  const mb = (n) => `${(n / 1048576).toFixed(1)} MB`;
+  async function importImage(file, target) {
+    if (file.size > IMAGE_MAX_BYTES) return toast(`“${file.name}” is ${mb(file.size)}. The limit is 5 MB.`, { kind: 'error' });
+    if (!IMAGE_TYPES.includes(file.type)) return toast(`“${file.name}” isn't a PNG, JPEG, WebP, GIF or AVIF image, so it was refused. (SVG files are refused because they can contain code.)`, { kind: 'error' });
+    let bmp;
+    try { bmp = await createImageBitmap(file); } catch { return toast(`“${file.name}” couldn't be read as an image, so it was refused.`, { kind: 'error' }); }
+    if (bmp.width > IMAGE_MAX_SIDE || bmp.height > IMAGE_MAX_SIDE) { bmp.close(); return toast(`“${file.name}” is ${bmp.width}×${bmp.height} pixels. The limit is ${IMAGE_MAX_SIDE}×${IMAGE_MAX_SIDE}.`, { kind: 'error' }); }
+    openCrop(bmp, file.name, target);
+  }
+  function openCrop(bmp, fileName, target) {
+    const c = { rot: 0, aspect: 'free', src: null, scale: 1, rect: null };
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `<div class="crop" role="dialog" aria-label="Crop image">
+      <div class="crop-head"><b>Crop image</b><span class="dim">${esc(fileName)} · ${bmp.width}×${bmp.height}</span></div>
+      <div class="crop-stage"><canvas></canvas><div class="crop-rect"><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i></div></div>
+      <div class="crop-tools"><div class="seg">${[['free', 'Free'], ['1', '1:1'], ['1.3333', '4:3'], ['1.7778', '16:9'], ['orig', 'Original']].map(([v, t]) => `<button data-aspect="${v}" class="${v === 'free' ? 'on' : ''}">${t}</button>`).join('')}</div><button class="mini rotate">↻ Rotate</button></div>
+      <div class="crop-foot"><span class="dim out"></span><span class="grow"></span><button class="ghost cancel">Cancel</button><button class="primary use">Use image</button></div>
+    </div>`;
+    shadow.appendChild(modal);
+    const canvas = modal.querySelector('canvas'), box = modal.querySelector('.crop-rect'), outLabel = modal.querySelector('.out');
+    const ratio = () => (c.aspect === 'free' ? null : c.aspect === 'orig' ? c.src.width / c.src.height : +c.aspect);
+    const outSize = () => { const w = c.rect.w / c.scale, h = c.rect.h / c.scale, k = Math.min(1, IMAGE_OUT_SIDE / Math.max(w, h)); return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)) }; };
+    const draw = () => {
+      Object.assign(box.style, { left: `${c.rect.x}px`, top: `${c.rect.y}px`, width: `${c.rect.w}px`, height: `${c.rect.h}px` });
+      const o = outSize(); outLabel.textContent = `Saves as ${o.w}×${o.h}`;
+    };
+    const fit = () => { // largest rectangle of the chosen shape, centered
+      const W = canvas.width, H = canvas.height, r = ratio();
+      let w = W, h = H;
+      if (r) { if (W / H > r) w = H * r; else h = W / r; }
+      c.rect = { x: (W - w) / 2, y: (H - h) / 2, w, h };
+      draw();
+    };
+    const layout = () => { // rotated full-size source, plus a scaled copy on screen
+      const quarter = c.rot % 180 !== 0;
+      c.src = Object.assign(document.createElement('canvas'), { width: quarter ? bmp.height : bmp.width, height: quarter ? bmp.width : bmp.height });
+      const g = c.src.getContext('2d');
+      g.translate(c.src.width / 2, c.src.height / 2); g.rotate((c.rot * Math.PI) / 180); g.drawImage(bmp, -bmp.width / 2, -bmp.height / 2);
+      c.scale = Math.min(560 / c.src.width, 360 / c.src.height, 1);
+      canvas.width = Math.round(c.src.width * c.scale); canvas.height = Math.round(c.src.height * c.scale);
+      canvas.getContext('2d').drawImage(c.src, 0, 0, canvas.width, canvas.height);
+      fit();
+    };
+    layout();
+    const close = () => { bmp.close(); modal.remove(); };
+    modal.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
+    modal.addEventListener('click', async (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.dataset.aspect) { c.aspect = b.dataset.aspect; modal.querySelectorAll('[data-aspect]').forEach((x) => x.classList.toggle('on', x === b)); return fit(); }
+      if (b.classList.contains('rotate')) { c.rot = (c.rot + 90) % 360; return layout(); }
+      if (b.classList.contains('cancel')) return close();
+      if (b.classList.contains('use')) { b.disabled = true; try { await useCrop(); } finally { b.disabled = false; } }
+    });
+    // drag inside the box to move it, drag a corner to resize it (keeping the chosen shape)
+    box.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const handle = e.target.dataset.h, s = { ...c.rect, px: e.clientX, py: e.clientY }, W = canvas.width, H = canvas.height, r = ratio();
+      const move = (ev) => {
+        const dx = ev.clientX - s.px, dy = ev.clientY - s.py;
+        if (!handle) { c.rect.x = clamp(s.x + dx, 0, W - s.w); c.rect.y = clamp(s.y + dy, 0, H - s.h); return draw(); }
+        const left = handle.includes('w'), top = handle.includes('n');
+        let w = clamp(s.w + (left ? -dx : dx), 16, left ? s.x + s.w : W - s.x);
+        let h = clamp(s.h + (top ? -dy : dy), 16, top ? s.y + s.h : H - s.y);
+        if (r) { if (w / h > r) w = h * r; else h = w / r; }
+        c.rect = { x: left ? s.x + s.w - w : s.x, y: top ? s.y + s.h - h : s.y, w, h };
+        draw();
+      };
+      const up = () => { removeEventListener('pointermove', move, true); removeEventListener('pointerup', up, true); };
+      addEventListener('pointermove', move, true); addEventListener('pointerup', up, true);
+    });
+    async function useCrop() {
+      // Re-encoding through a canvas keeps only the pixels: no hidden data, no GPS location.
+      const o = outSize();
+      const out = Object.assign(document.createElement('canvas'), { width: o.w, height: o.h });
+      out.getContext('2d').drawImage(c.src, c.rect.x / c.scale, c.rect.y / c.scale, c.rect.w / c.scale, c.rect.h / c.scale, 0, 0, o.w, o.h);
+      const webp = out.toDataURL('image/webp').startsWith('data:image/webp');
+      const type = webp ? 'image/webp' : 'image/png';
+      let blob = await new Promise((res) => out.toBlob(res, type, 0.9));
+      if (blob && blob.size > IMAGE_MAX_BYTES && webp) blob = await new Promise((res) => out.toBlob(res, type, 0.7));
+      if (!blob || blob.size > IMAGE_MAX_BYTES) return toast(`The cropped image is still over 5 MB (${blob ? mb(blob.size) : '?'}). Crop it smaller.`, { kind: 'error' });
+      const data = await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1]); fr.readAsDataURL(blob); });
+      stageImage(target, blob, data, `${fileName.replace(/\.[^.]*$/, '')}.${webp ? 'webp' : 'png'}`, o);
+      close();
+    }
+  }
+  function stageImage(target, blob, data, name, size) {
+    const el = target.el, loc = locOf(el);
+    if (!el || !loc) return toast('This element has no source location, so its image can\'t be replaced here. Ask AI instead.', { kind: 'error' });
+    const url = URL.createObjectURL(blob);
+    const img = target.kind === 'img-src';
+    const before = img ? { src: el.getAttribute('src'), srcset: el.getAttribute('srcset') } : { bi: el.style.backgroundImage, bs: el.style.backgroundSize, bp: el.style.backgroundPosition };
+    st.pending.filter((p) => p.kind === 'image' && p.el === el && p.change.kind === target.kind).forEach((p) => { p.undoPreview(); st.pending.splice(st.pending.indexOf(p), 1); });
+    if (img) { el.removeAttribute('srcset'); el.src = url; } else Object.assign(el.style, { backgroundImage: `url("${url}")`, backgroundSize: 'cover', backgroundPosition: 'center' });
+    st.pending.push({
+      el, kind: 'image', preview: [], affected: [el],
+      label: `${img ? 'image' : 'background image'} → ${name} (${size.w}×${size.h})`,
+      where: `saved in images/ next to ${loc.file}`,
+      change: { kind: target.kind, loc, data, name },
+      undoPreview: () => {
+        if (img) { if (before.src == null) el.removeAttribute('src'); else el.setAttribute('src', before.src); if (before.srcset) el.setAttribute('srcset', before.srcset); }
+        else Object.assign(el.style, { backgroundImage: before.bi, backgroundSize: before.bs, backgroundPosition: before.bp });
+        URL.revokeObjectURL(url);
+      },
+    });
+    renderPending();
+    positionBoxes();
+  }
+
   function colorInput(prop, hex, varName) {
     return `<span class="color"><input type="color" data-prop="${prop}" value="${hex || '#ffffff'}"><input class="hex" data-hex="${prop}" value="${hex || 'none'}" spellcheck="false">${varName ? `<label class="var" title="This color comes from a theme variable"><input type="checkbox" class="linkvar" ${st.linkVars ? 'checked' : ''}> ${esc(varName)}</label>` : ''}</span>`;
   }
@@ -889,6 +1012,7 @@ import { STYLES } from './styles.js';
     if (b.dataset.scope) { st.scope = b.dataset.scope; restage(); renderPanel(); positionBoxes(); return; }
     if (b.dataset.align) return stage('text-align', b.dataset.align);
     if (b.dataset.fxApply) return applyGradient(b.dataset.fxApply === 'no-gradient');
+    if (b.classList.contains('pick-image')) return pickImage(b.dataset.target);
     if (b.classList.contains('move')) return moveSel(b.dataset.dir);
     if (b.classList.contains('save')) return save();
     if (b.classList.contains('discard')) return discard();

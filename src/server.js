@@ -76,10 +76,17 @@ export function createServer({ root, proxy = null, log = console.log }) {
     return /<\/body>/i.test(html) ? html.replace(/<\/body>(?![\s\S]*<\/body>)/i, `${tag}</body>`) : html + tag;
   };
 
-  async function readJson(req) {
+  // Every request body has a cap: 1 MB normally, 8 MB for a save (a 5 MB image as base64).
+  const MB = 1024 * 1024;
+  async function readJson(req, limit = 1 * MB) {
     const chunks = [];
-    for await (const c of req) chunks.push(c);
-    return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+    let size = 0;
+    for await (const c of req) {
+      size += c.length;
+      if (size > limit) { req.destroy(); throw new H.EditError(`Request is larger than ${Math.round(limit / MB)} MB.`, 413); }
+      chunks.push(c);
+    }
+    try { return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { throw new H.EditError('Request is not valid JSON.', 400); }
   }
   const send = (res, code, body, type = 'application/json') => {
     res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' });
@@ -133,7 +140,7 @@ export function createServer({ root, proxy = null, log = console.log }) {
         return send(res, 200, { ok: true });
       }
       if (route === 'apply' && req.method === 'POST') {
-        const body = await readJson(req);
+        const body = await readJson(req, 8 * MB);
         if (!(await G.isRepo(root))) return send(res, 412, { error: 'This folder is not a git repository yet. Click "Turn on undo (git init)" first.' });
         const result = await applyPlan({ root, inRoot, rel, resolveSheet, pageUrl: body.pageUrl, changes: body.changes });
         const files = Object.keys(result.writes);
@@ -144,6 +151,7 @@ export function createServer({ root, proxy = null, log = console.log }) {
         }
         for (const [abs, content] of Object.entries(result.writes)) {
           recentWrites.set(abs, Date.now());
+          await fsp.mkdir(path.dirname(abs), { recursive: true }); // e.g. a new images/ folder
           await fsp.writeFile(abs, content);
         }
         const labels = [...new Set(result.results.map((r) => r.label).filter(Boolean))];
