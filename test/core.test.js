@@ -155,3 +155,10 @@ test('background shorthand: simple value is rewritten, complex one is overridden
 test('background: var(--x) counts as a simple value to replace', () => {
   assert.equal(C.setDeclaration('.b { background: var(--ink); }', { selector: '.b' }, 'background-color', '#f97316'), '.b { background: #f97316; }');
 });
+
+test('tailwind: shadow and opacity become utilities; colored shadows keep their own classes', () => {
+  assert.equal(swapClass('p-4 shadow-md rounded', 'box-shadow', '0 8px 24px rgba(15, 23, 42, 0.14)'), 'p-4 rounded shadow-[0_8px_24px_rgba(15,23,42,0.14)]');
+  assert.equal(swapClass('shadow-lg', 'box-shadow', 'none'), 'shadow-none');
+  assert.equal(swapClass('opacity-50 text-sm', 'opacity', '0.8'), 'text-sm opacity-[0.8]');
+  assert.equal(swapClass('shadow-blue-500/50 shadow', 'box-shadow', 'none'), 'shadow-blue-500/50 shadow-none');
+});

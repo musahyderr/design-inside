@@ -151,6 +151,9 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await ui('[data-prop="width"]').fill('120');
   await ui('[data-prop="width"]').press('Enter');
   check(await page.$eval('#em-test-img', (e) => e.style.height) === 'auto', 'Keep proportions sets the other side to auto');
+  await ui('[data-fx="filter"][data-f="grayscale"]').fill('100');
+  check((await page.$eval('#em-test-img', (e) => getComputedStyle(e).filter)).includes('grayscale(1)'), 'image filters preview live (grayscale)');
+  check(await ui('[data-fx="grad-a"]').count() === 0, 'images get filters instead of gradient and border');
   await page.click('#em-test-inline');
   check(await ui('[data-prop="width"]').count() === 0 && await ui('[data-prop="font-family"]').count() === 1, 'inline text hides width/height, keeps font');
   await ui('.discard').click();
@@ -237,6 +240,25 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await ui('.panel header .src').dblclick();
   check((await box()).l > 1000 && (await ui('.panel').evaluate((p) => p.dataset.dock)) === 'auto', 'double-clicking the top bar puts the panel back');
   await page.click('.logo', { position: { x: 4, y: 4 } });
+
+  // 9e. effects: shadow, opacity, gradient and border on a card, saved and committed
+  await page.click('.card:not(.featured)', { position: { x: 8, y: 8 } });
+  await ui('[data-tab="style"]').click();
+  await ui('[data-fx="shadow"]').selectOption('medium');
+  await ui('[data-fx="opacity"]').fill('80');
+  await ui('[data-fx="grad-b"]').fill('#a78bfa');
+  await ui('[data-fx-apply="gradient"]').click();
+  await ui('[data-fx="border-w"]').fill('2');
+  await ui('[data-fx="border-w"]').press('Enter');
+  const fx = await page.$eval('.card:not(.featured)', (e) => { const c = getComputedStyle(e); return { s: c.boxShadow, o: c.opacity, g: c.backgroundImage, b: c.borderTopWidth }; });
+  check(fx.s !== 'none' && fx.o === '0.8' && fx.g.includes('linear-gradient') && fx.b === '2px', `effects preview live on the card (${fx.o}, ${fx.b})`);
+  await waitReload(() => ui('.save').click());
+  const fxHtml = read('index.html');
+  const cardTag = (fxHtml.match(/<article class="card" style="[^"]*">/) || [''])[0];
+  check(cardTag.includes('box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14)') && cardTag.includes('opacity: 0.8') && /background-image: linear-gradient\(135deg, #[0-9a-f]{6}, #a78bfa\)/.test(cardTag) && /border: 2px solid #[0-9a-f]{6}/.test(cardTag), 'effects are written to index.html');
+  check(log()[0].startsWith('design-inside:') && log()[0].includes('shadow'), `effects are one commit ("${log()[0].slice(0, 60)}…")`);
+  await page.click('.card:not(.featured)', { position: { x: 8, y: 8 } });
+  check((await ui('[data-fx="shadow"]').inputValue()) === 'medium', 'the panel reads the saved shadow back as Medium');
 
   // 10. ask AI for something the panel can't do
   await page.click('.card.featured', { position: { x: 8, y: 8 } });
