@@ -213,6 +213,8 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await page.mouse.up();
   await page.waitForTimeout(650); // below the minimum it stretches like rubber, then springs back
   check(Math.round((await box()).w) === 236, `the panel springs back to its minimum width (${Math.round((await box()).w)}px)`);
+  const spill = await ui('.body').evaluate((b) => ({ body: b.scrollWidth - b.clientWidth, rows: [...b.querySelectorAll('.row')].filter((r) => r.scrollWidth > r.clientWidth + 1).length }));
+  check(spill.body <= 1 && spill.rows === 0, `at its narrowest, nothing in the panel spills sideways (${spill.body}px, ${spill.rows} rows)`);
   const thumb = await ui('.body').evaluate((b) => getComputedStyle(b).scrollbarColor);
   const [tr, tg, tb] = (thumb.match(/\d+(\.\d+)?/g) || []).map(Number);
   check(Math.max(tr, tg, tb) <= 70, `the panel uses a dark scrollbar (${thumb})`);
@@ -257,6 +259,11 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await ui('[data-fx="border-w"]').press('Enter');
   const fx = await page.$eval('.card:not(.featured)', (e) => { const c = getComputedStyle(e); return { s: c.boxShadow, o: c.opacity, g: c.backgroundImage, b: c.borderTopWidth }; });
   check(fx.s !== 'none' && fx.o === '0.8' && fx.g.includes('linear-gradient') && fx.b === '2px', `effects preview live on the card (${fx.o}, ${fx.b})`);
+  check((await ui('.pend-toggle').textContent()).includes('4 changes to save') && !(await ui('footer ol').isVisible()), 'more than three changes collapse into one "changes to save" row');
+  await ui('.pend-toggle').click();
+  check(await ui('footer ol').isVisible() && (await ui('footer li').count()) === 4, 'tapping it shows the list of changes');
+  const gradRow = await ui('.grad').evaluate((g) => { const r = g.closest('.row'); return r.scrollWidth <= r.clientWidth + 1; });
+  check(gradRow, 'the gradient row fits inside the panel');
   await waitReload(() => ui('.save').click());
   const fxHtml = read('index.html');
   const cardTag = (fxHtml.match(/<article class="card" style="[^"]*">/) || [''])[0];

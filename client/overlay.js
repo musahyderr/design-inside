@@ -1095,8 +1095,13 @@ import { STYLES } from './styles.js';
       foot.innerHTML = `<p class="hint">Changes show live. Nothing is saved until you press Save.</p>`;
       return;
     }
+    // Many changes would crowd out the controls: past three, show a one-line summary to tap open.
+    const many = st.pending.length > 3;
+    const open = !many || st.pendingOpen;
+    const where = (p) => (p.fallback ? '→ will be handed to your AI agent' : `→ ${p.where}${p.affected && p.affected.length > 1 ? ` · ${p.affected.length} elements` : ''}`);
     foot.innerHTML = `
-      <ol>${st.pending.map((p, i) => `<li class="${p.fallback ? 'fb' : ''}"><div><b>${esc(p.label)}</b><small>${p.fallback ? '→ will be handed to your AI agent' : `→ ${esc(p.where)}${p.affected && p.affected.length > 1 ? ` · ${p.affected.length} elements` : ''}`}</small></div><button class="ghost drop" data-i="${i}" title="Remove">✕</button></li>`).join('')}</ol>
+      ${many ? `<button class="pend-toggle" aria-expanded="${open}">${st.pending.length} changes to save<i class="chev"></i></button>` : ''}
+      <ol class="${open ? '' : 'collapsed'}">${st.pending.map((p, i) => `<li class="${p.fallback ? 'fb' : ''}"><div><b title="${esc(p.label)}">${esc(p.label)}</b><small title="${esc(where(p))}">${esc(where(p))}</small></div><button class="ghost drop" data-i="${i}" title="Remove">✕</button></li>`).join('')}</ol>
       <div class="actions"><button class="ghost discard">Discard</button><button class="primary save">Save & commit <kbd>⌘S</kbd></button></div>`;
   }
   function renderDockBadge() {
@@ -1110,6 +1115,7 @@ import { STYLES } from './styles.js';
     const b = e.target.closest('button');
     if (!b) return;
     if (b.classList.contains('close')) return pick(null);
+    if (b.classList.contains('pend-toggle')) { st.pendingOpen = !st.pendingOpen; return renderPending(); }
     if (b.dataset.foldToggle) return toggleFold(b.dataset.foldToggle);
     if (b.classList.contains('layout-btn')) { st.layoutOpen = !st.layoutOpen; return renderPanel(); }
     if (b.classList.contains('min-btn')) { st.layout.min = !st.layout.min; saveLayout(); renderPanel(); return applyLayout(); }
