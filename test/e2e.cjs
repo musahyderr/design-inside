@@ -14,7 +14,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
 
 (async () => {
   const browser = await chromium.launch(process.env.EM_BROWSER ? { channel: process.env.EM_BROWSER } : {});
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: shots ? 2 : 1 });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const shot = async (name) => { if (shots) await page.screenshot({ path: path.join(shots, `${String(++n).padStart(2, '0')}-${name}.png`) }); };
@@ -56,12 +56,12 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
 
   // 3. double-click to edit the headline
   await page.dblclick('.hero h1');
-  await page.keyboard.press('Control+a');
+  await page.keyboard.press('ControlOrMeta+a'); // Cmd+A on macOS, Ctrl+A elsewhere
   await page.keyboard.type('Charge everything. Carry nothing else.');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(100);
   await shot('text-edit');
-  await waitReload(() => page.keyboard.press('Control+s'));
+  await waitReload(() => page.keyboard.press('ControlOrMeta+s'));
   check(read('index.html').includes('<h1>Charge everything. Carry nothing else.</h1>'), 'headline text written to index.html');
 
   // 4. "just this one" on a repeated element -> inline style, not the shared rule
@@ -126,6 +126,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   check(await ui('[data-prop="font-family"]').count() === 1, 'text element shows font controls');
   await ui('[data-text]').fill('Fast charging for every device you own.');
   await ui('[data-text]').press('Enter');
+  await shot('text-box');
   check((await page.textContent('.lede')) === 'Fast charging for every device you own.', 'Text box previews the new text on the page');
   await waitReload(() => ui('.save').click());
   check(read('index.html').includes('<p class="lede">Fast charging for every device you own.</p>'), 'Text box writes the new text to index.html');
@@ -167,13 +168,13 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   });
   check(drift <= 1, `selection outline follows the element while scrolling (off by ${Math.round(drift)}px)`);
 
-  // 10. ask Claude for something the panel can't do
+  // 10. ask AI for something the panel can't do
   await page.click('.card.featured', { position: { x: 8, y: 8 } });
   await ui('[data-tab="claude"]').click();
   await ui('.ask').fill('make this card lift slightly with a shadow on hover');
   await ui('.send').click();
   await page.waitForTimeout(300);
-  await shot('ask-claude');
+  await shot('ask-ai');
   const q = read('.editor-mode/requests.md');
   check(q.includes('## [ ]') && q.includes('lift slightly') && q.includes('index.html'), 'request queued in .editor-mode/requests.md with source location');
   check(!execSync('git status --porcelain', { cwd: site }).toString().includes('.editor-mode'), 'queue file is git-excluded');
@@ -181,7 +182,7 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   // 11. safety: refuse to edit a file with the user's uncommitted work
   await page.click('.logo', { position: { x: 4, y: 4 } }); // nothing pending, so live reload may run
   await waitReload(async () => fs.appendFileSync(path.join(site, 'styles.css'), '\n/* my own unsaved work */\n'));
-  check(true, 'page live-reloads when a file changes outside the editor (e.g. Claude edits it)');
+  check(true, 'page live-reloads when a file changes outside the editor (e.g. an AI agent edits it)');
   await page.click('.card:not(.featured)', { position: { x: 8, y: 8 } });
   await ui('[data-scope="all"]').click();
   await ui('[data-prop="border-radius"]').fill('4');

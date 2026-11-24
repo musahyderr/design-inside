@@ -11,15 +11,16 @@ echo "ok"
 echo "== build"; npm run build --silent
 
 PIDS=(); DIRS=()
-cleanup() { for p in "${PIDS[@]}"; do kill "$p" 2>/dev/null || true; done; for d in "${DIRS[@]}"; do rm -rf "$d"; done; }
+# ${A[@]+"${A[@]}"}: empty arrays are "unbound" under set -u in bash 3.2 (macOS).
+cleanup() { for p in ${PIDS[@]+"${PIDS[@]}"}; do kill "$p" 2>/dev/null || true; done; for d in ${DIRS[@]+"${DIRS[@]}"}; do rm -rf "$d"; done; }
 trap cleanup EXIT
-copy() { # git copy of a fixture folder, printed path
+copy() { # git copy of a fixture folder into $COPY (no subshell, so DIRS is kept for cleanup)
   local d; d="$(mktemp -d)"; DIRS+=("$d")
   cp -r "$1"/. "$d"/
   git -C "$d" init -q -b main
   git -C "$d" config user.name check; git -C "$d" config user.email check@localhost
   git -C "$d" add -A && git -C "$d" commit -qm init
-  echo "$d"
+  COPY="$d"
 }
 TOTAL_PASS=0; TOTAL_FAIL=0
 suite() { # name, test file, url, site
@@ -33,12 +34,12 @@ suite() { # name, test file, url, site
 }
 
 echo "== browser e2e"
-SITE="$(copy examples/charger-site)"
+copy examples/charger-site; SITE="$COPY"
 node dist/editor-mode.mjs "$SITE" --port 4499 >/dev/null 2>&1 & PIDS+=($!)
-APP="$(copy test/fixtures/proxy-app)"
+copy test/fixtures/proxy-app; APP="$COPY"
 node test/fixtures/devserver.cjs "$APP" 4496 & PIDS+=($!)
 node dist/editor-mode.mjs --proxy 4496 "$APP" --port 4495 >/dev/null 2>&1 & PIDS+=($!)
-TW="$(copy test/fixtures/tailwind-site)"
+copy test/fixtures/tailwind-site; TW="$COPY"
 node dist/editor-mode.mjs "$TW" --port 4494 >/dev/null 2>&1 & PIDS+=($!)
 sleep 1.5
 

@@ -17,6 +17,26 @@ const MIME = {
   '.mp4': 'video/mp4', '.webm': 'video/webm', '.txt': 'text/plain; charset=utf-8',
 };
 
+// The queue file explains itself, so any AI coding agent (Claude Code, Gemini CLI,
+// Codex, Cursor…) can be told "apply .editor-mode/requests.md" and know what to do.
+const QUEUE_HEADER = `# editor-mode requests
+
+Changes the visual editor couldn't make safely by itself. To apply them, ask your
+AI coding agent: "apply .editor-mode/requests.md" (in Claude Code: /editor-mode:apply).
+
+Instructions for the AI agent:
+1. Work through each unchecked "## [ ]" request below, in order.
+2. Find the element in the source using the file, element path, selector and HTML snippet given.
+   On framework projects, search components for distinctive text or class names from the snippet.
+3. Make the smallest change that does what was asked, in the project's existing style (its CSS
+   files and naming, or Tailwind utilities if it uses Tailwind). Don't touch unrelated code.
+4. Skip a request that is ambiguous or needs a design decision, and add a short note under it.
+5. Commit each applied request on its own, staging only the files you changed, with the message
+   "editor-mode (ai): <short description>", so it can be undone from the editor's History tab.
+6. Tick the box ("## [x]") and add "Done in <commit sha>" under it.
+
+`;
+
 export function createServer({ root, proxy = null, log = console.log }) {
   root = path.resolve(root);
   // editor-mode edits the user's own site only: it wraps dev servers on this machine, never a remote site.
@@ -143,7 +163,7 @@ export function createServer({ root, proxy = null, log = console.log }) {
       }
       if (route === 'ask' && req.method === 'POST') {
         const body = await readJson(req);
-        const entry = await queueForClaude(body);
+        const entry = await queueForAgent(body);
         return send(res, 200, { ok: true, ...entry });
       }
       return send(res, 404, { error: 'unknown endpoint' });
@@ -154,7 +174,7 @@ export function createServer({ root, proxy = null, log = console.log }) {
     }
   }
 
-  // ---------- Claude hand-off queue ----------
+  // ---------- AI agent hand-off queue ----------
   const queueDir = path.join(root, '.editor-mode');
   const queueFile = path.join(queueDir, 'requests.md');
   async function excludeQueue() {
@@ -167,7 +187,7 @@ export function createServer({ root, proxy = null, log = console.log }) {
   async function pendingCount() {
     try { return ((await fsp.readFile(queueFile, 'utf8')).match(/^## \[ \]/gm) || []).length; } catch { return 0; }
   }
-  async function queueForClaude(b) {
+  async function queueForAgent(b) {
     await fsp.mkdir(queueDir, { recursive: true });
     await excludeQueue();
     const id = Date.now().toString(36);
@@ -189,11 +209,11 @@ export function createServer({ root, proxy = null, log = console.log }) {
       '',
     ].filter((l) => l !== null);
     if (!fs.existsSync(queueFile)) {
-      await fsp.writeFile(queueFile, '# editor-mode requests\n\nChanges the visual editor handed to Claude. Run `/editor-mode:apply` in Claude Code to apply them.\nClaude ticks each box when done.\n\n');
+      await fsp.writeFile(queueFile, QUEUE_HEADER);
     }
     await fsp.appendFile(queueFile, lines.join('\n') + '\n');
     const prompt = `In this project, ${b.request}\n\nThe element is \`${b.selector}\`${b.loc ? ` in ${b.loc.file}` : ''}:\n\n\`\`\`html\n${(b.html || '').slice(0, 1500)}\n\`\`\`\n${b.styles ? `\nCurrent styles: ${Object.entries(b.styles).map(([k, v]) => `${k}: ${v}`).join('; ')}\n` : ''}\nChange only what is asked, keep the existing code style, and don't touch unrelated rules.`;
-    log(`  → queued for Claude: ${b.request}`);
+    log(`  → queued for your AI agent: ${b.request}`);
     return { id, file: rel(queueFile), prompt };
   }
 

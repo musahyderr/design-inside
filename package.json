@@ -2,15 +2,39 @@
   "name": "editor-mode",
   "version": "0.1.0",
   "description": "Click any element on your localhost site, change it visually, and editor-mode writes the change into your real source files and commits it.",
+  "keywords": [
+    "visual-editor",
+    "localhost",
+    "claude-code",
+    "css",
+    "tailwind",
+    "ai-agent",
+    "gemini-cli",
+    "codex",
+    "localhost-only"
+  ],
+  "homepage": "https://github.com/musahyderr/editor-mode#readme",
+  "bugs": "https://github.com/musahyderr/editor-mode/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/musahyderr/editor-mode.git"
+  },
+  "license": "MIT",
+  "author": "editor-mode contributors",
+  "type": "module",
   "main": "src/server.js",
+  "bin": {
+    "editor-mode": "dist/editor-mode.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "test": "node --test test/*.test.js",
     "build": "node scripts/build.js",
     "start": "node bin/cli.js",
     "check": "bash scripts/check.sh"
   },
-  "author": "",
-  "license": "MIT",
   "dependencies": {
     "parse5": "^8.1.1",
     "postcss": "^8.5.33"
@@ -18,16 +42,5 @@
   "devDependencies": {
     "esbuild": "^0.28.2",
     "playwright": "^1.65.1"
-  },
-  "type": "module",
-  "bin": {
-    "editor-mode": "dist/editor-mode.mjs"
-  },
-  "keywords": [
-    "visual-editor",
-    "localhost",
-    "claude-code",
-    "css",
-    "tailwind"
-  ]
+  }
 }

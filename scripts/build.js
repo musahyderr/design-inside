@@ -1,4 +1,4 @@
-// Bundles everything into dist/ so the Claude Code plugin runs with no npm install.
+// Bundles everything into dist/ so the tool (and the Claude Code plugin) runs with no npm install.
 import { build } from 'esbuild';
 
 await build({
@@ -8,7 +8,7 @@ await build({
 });
 await build({
   entryPoints: ['bin/cli.js'],
-  bundle: true, platform: 'node', format: 'esm', target: 'node18',
+  bundle: true, platform: 'node', format: 'esm', target: 'node22',
   outfile: 'dist/editor-mode.mjs', legalComments: 'none',
   banner: { js: "#!/usr/bin/env node\nimport { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
 });

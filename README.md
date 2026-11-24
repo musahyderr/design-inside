@@ -1,36 +1,74 @@
-# editor-mode
+<h1 align="center">editor-mode</h1>
 
-**Click anything on your localhost site, change it visually, and editor-mode writes the change into your real source files and commits it to git.** Anything it can't do safely goes to Claude.
+<p align="center"><b>Click anything on your localhost site, change it visually, and editor-mode writes the change into your real source files and commits it to git.</b></p>
 
-Built for the moment after an AI generates your site and *one thing* is off: a card color, a heading font, some text.
+<p align="center">
+  <a href="https://github.com/musahyderr/editor-mode/actions/workflows/check.yml"><img alt="check" src="https://github.com/musahyderr/editor-mode/actions/workflows/check.yml/badge.svg"></a>
+  <img alt="tested on Linux, macOS and Windows" src="https://img.shields.io/badge/tested%20on-Linux%20%7C%20macOS%20%7C%20Windows-informational">
+  <img alt="Node 22+" src="https://img.shields.io/badge/node-%3E%3D22-339933">
+  <img alt="works with any AI agent" src="https://img.shields.io/badge/AI%20agent-any%20(or%20none)-8b5cf6">
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
+</p>
 
-![Changing all three cards at once; the panel shows which rule in which file will change](docs/pending.png)
+> [!IMPORTANT]
+> **Only for your own localhost.** editor-mode runs on your computer and edits the site *you* serve from it (`localhost`, `127.0.0.1`). It can't open, wrap or change anyone else's website, it only answers your own browser, and other websites you visit can't use it.
+
+Built for the moment after an AI generates your site and *one thing* is off: a card color, a heading font, some text. Fix it yourself in seconds, with no prompt and no tokens. For anything bigger, it hands a precise request to your AI coding agent: Claude Code, Gemini CLI, Codex, Cursor or any other.
+
+![The editor panel next to a site: all three cards are being changed at once, and the panel lists exactly which rule in which file each change will be written to](docs/screenshots/panel.png)
+
+## Quick start
+
+You need [Node.js](https://nodejs.org) 22+ and git, on Linux, macOS or Windows.
+
+```bash
+git clone https://github.com/musahyderr/editor-mode.git
+```
+
+```bash
+node editor-mode/dist/editor-mode.mjs ./my-site
+```
+
+Open **http://localhost:4400**, press **Alt+E** (or click **Edit page**), and click anything. Already running a dev server on, say, port 5173? Wrap it instead, and its hot reload keeps working:
+
+```bash
+node editor-mode/dist/editor-mode.mjs --proxy 5173 ./my-site
+```
+
+The tool is a single bundled file, so there's nothing to `npm install`. Using Claude Code? Install it as a plugin instead: see [With Claude Code](#with-claude-code).
+
+## The panel
+
+The panel shows only the controls that fit what you clicked. A heading gets text and font controls, an image gets size with *Keep proportions*, and a card gets background, spacing and "Text inside".
+
+| | |
+|---|---|
+| ![Text box: a paragraph is selected and its new text is typed into the panel](docs/screenshots/text-box.png) | ![Theme color: changing an orange accent through the --accent theme variable](docs/screenshots/theme-variable.png) |
+| **Text box.** Type new text in the panel, or double-click it on the page. | **Theme colors.** Change a color everywhere through its `--variable`, or only here. |
+| ![History tab: every save is a commit with an Undo button](docs/screenshots/history.png) | ![Ask AI tab: a request is queued for an AI agent, with a Copy prompt button](docs/screenshots/ask-ai.png) |
+| **History.** Every save is a git commit with one-click **Undo**. | **Ask AI.** Anything the panel can't do goes to your AI agent, with the exact source location. |
 
 ## What it does
 
 | You do | It writes |
 |---|---|
-| Double-click text, or type in the panel's Text box | The text inside that element in your `.html` file |
-| Change a color, size, padding or corner radius for **all similar** elements | The rule that actually wins the cascade, in its own file, e.g. `.card { … }` in `styles.css`, including rules in `@media` blocks and in `<style>` tags |
-| Change it for **just this one** | An inline `style=""` on that element only. If a rule is used by that element alone, it edits that rule instead |
-| Change a color that comes from `var(--accent)` | You choose: the theme variable in `:root` (changes everywhere) or only this element |
-| Pick a font from the curated list | Adds the Google Fonts `<link>` once and writes `font-family` with fallbacks |
-| Move an item earlier or later | Swaps the two elements in the HTML source |
-| Edit a Tailwind element | Swaps the conflicting utilities: `text-slate-900 text-2xl` → `text-[#ea580c] text-[32px]` |
-| Ask for anything else ("zoom the image on hover") | Queues it with the element's source location and styles for `/editor-mode:apply` |
+| Type in the Text box, or double-click text | The text of that element in your source file |
+| Change a color, font, size, padding or corners for **all similar** elements | The rule that actually wins the cascade, in its own file, e.g. `.card { … }` in `styles.css`, including rules in `@media` blocks and `<style>` tags |
+| Change it for **just this one** | An inline `style=""` on that element only, or the rule if only that element uses it |
+| Change a color that comes from `var(--accent)` | Your choice: the theme variable in `:root` (changes everywhere) or only this element |
+| Pick a font from the curated list | The Google Fonts `<link>`, added once, plus `font-family` with fallbacks |
+| Resize an image | Width or height, with the other side set to `auto` to keep its proportions |
+| Move an item earlier or later | The two elements, swapped in the HTML source |
+| Edit a Tailwind element | Swapped utilities: `text-slate-900 text-2xl` → `text-[#ea580c] text-[32px]` |
+| Ask for anything else ("zoom the image on hover") | A request in `.editor-mode/requests.md` with the element's file, selector and styles, for your AI agent |
 
-Every save is **one git commit** that touches only the files it changed. **Undo** is a `git revert` (it never rewrites history), from the toast or the History tab.
+Every save is **one git commit** that touches only the files it changed. **Undo** is a `git revert`, from the toast or the History tab, and it never rewrites history.
 
-## Safety rules (these are the design)
+## Use it with your AI agent
 
-- **Previews are live, writes are explicit.** Nothing touches disk until you press Save. The pending list tells you the exact destination of every change *before* you save.
-- **It refuses rather than guesses.** If the text or class list in the file no longer matches the page, or a search finds the text in two places, it stops and offers to hand the change to Claude.
-- **It never commits over your work.** If a file it needs has uncommitted changes, it won't touch that file.
-- **Minimal diffs.** HTML edits are byte-range splices at parser source offsets, and CSS goes through postcss, so formatting outside the changed value is preserved. Changing one color is a one-line diff.
-- **Only inside the project folder**, never `.git`, `node_modules` or dotfiles like `.env` (which are also never served).
-- **Only your browser, only on localhost.** The server listens on 127.0.0.1, refuses any other `Host` (DNS rebinding), and refuses writes that come from another website or aren't JSON, so a page you visit can't edit your files or queue instructions for Claude. Edited values are checked so they can't break out of the CSS declaration or HTML attribute they go into.
+The panel works without any AI. The **Ask AI** tab is for changes it can't make safely, such as layout, new sections, hover effects or React components. Your request is saved to `.editor-mode/requests.md` together with the element's source location and current styles, and the top of that file tells the agent exactly what to do.
 
-## Install (Claude Code plugin)
+### With Claude Code
 
 ```bash
 /plugin marketplace add musahyderr/editor-mode
@@ -40,48 +78,67 @@ Every save is **one git commit** that touches only the files it changed. **Undo*
 /plugin install editor-mode@editor-mode
 ```
 
-Then in any project:
+Then, in your project:
 
-- `/editor-mode:start` detects a running dev server or a plain HTML folder and starts the editor.
-- `/editor-mode:apply` makes Claude apply what you queued in the **Ask Claude** tab, one commit per request, so each one is undoable from the editor.
+- `/editor-mode:start` finds your running dev server or HTML folder and starts the editor.
+- `/editor-mode:apply` applies what you queued, one commit per request, so each one can be undone from the editor.
 
-The plugin ships a single bundled file (`dist/editor-mode.mjs`, Node 18+), so there's nothing to `npm install`.
+### With Gemini CLI, Codex, Cursor, Copilot or any other agent
 
-### Or run it directly
+Start the editor as in [Quick start](#quick-start), queue requests in the **Ask AI** tab, then tell your agent:
 
-```bash
-node dist/editor-mode.mjs ./my-site
-```
+> apply .editor-mode/requests.md
 
-```bash
-node dist/editor-mode.mjs --proxy 5173 .
-```
+No coding agent? Click **Copy prompt** on the toast and paste it into any AI chat.
 
-The first serves a plain HTML/CSS folder. The second wraps a running dev server (Vite, Next, Astro…) and keeps its hot reload working through a websocket passthrough. Open `http://localhost:4400`, press **Alt+E**, and click.
+## Safety (these rules are the design)
+
+- **Your localhost only.** The server listens on 127.0.0.1 and refuses any other `Host`, which blocks DNS rebinding. It refuses writes that come from another website or aren't JSON, so a page you visit can't edit your files or queue instructions for your AI. `--proxy` only wraps a dev server on your own computer.
+- **Previews are live, writes are explicit.** Nothing touches disk until you press **Save**, and the pending list shows the exact destination of every change before you do.
+- **It refuses rather than guesses.** If the file no longer matches the page, or a search finds the text in two places, it stops and offers to hand the change to your AI agent.
+- **It never commits over your work.** If a file it needs has uncommitted changes, it won't touch that file.
+- **Minimal diffs.** HTML edits are byte-range splices and CSS goes through postcss, so changing one color is a one-line diff. Windows (CRLF) line endings are kept.
+- **Only inside the project folder.** It never touches `.git`, `node_modules` or dotfiles such as `.env`, which are never served either. Edited values are checked so they can't break out of the CSS or HTML they go into.
 
 ## How it works
 
 ```
-browser ── localhost:4400 ── editor-mode ── (static files | your dev server)
+browser ── localhost:4400 ── editor-mode ── (your files | your dev server on localhost)
    │                             │
    overlay (shadow DOM)          ├─ tags each served element with data-em="file#element-path"
    ├─ reads the live CSSOM       ├─ applies a batch of changes in memory; writes only if all succeed
    │  to find the winning rule   ├─ git commit / git revert
-   └─ POST /__em/apply ─────────▶└─ watches files; reloads the page when Claude edits them
+   └─ POST /__em/apply ─────────▶└─ watches files; reloads the page when your AI edits them
 ```
 
-- **Element paths, not line numbers.** Elements are identified by their position in the *source* parse tree (`0.1.2.1.2`). Text, attribute and style edits don't change paths, so the page stays mapped after every save.
-- **The browser decides which rule wins.** The overlay walks `document.styleSheets`, keeps rules whose media queries match and whose selectors match the element (ignoring `:hover`), and ranks them by `!important`, specificity and order. The server finds the same rule with postcss using a shared selector normalizer.
-- **Framework pages** (React, Vue…) have no source map. There, text and Tailwind class edits work by finding the one place in your source that contains that exact string. If it isn't exactly one place, the change goes to Claude.
+- **Element paths, not line numbers.** Elements are identified by their position in the source parse tree, so the page stays mapped after every save.
+- **The browser decides which rule wins.** The overlay ranks matching rules by `!important`, specificity and order, and the server finds the same rule with postcss.
+- **Framework pages** (React, Vue…) have no source map. There, text and Tailwind class edits find the one place in your source with that exact string. If there isn't exactly one, the change goes to your AI agent.
 
-## Current limits (v0.1)
+More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-- One-off and per-rule styling of **framework components** without Tailwind goes through Claude (no per-framework source plugins yet).
-- CSS nesting, `@scope`, and CSS-in-JS (styled-components, CSS modules' hashed names) aren't edited directly.
-- Text with inline markup inside it (`Hello <b>world</b>`) is edited part by part, or via Claude.
-- Position means **order**, not free drag-and-drop; free positioning breaks responsive layouts.
+## Limits (v0.1)
 
-## Development
+- One-off styling of **framework components** without Tailwind goes to your AI agent; there are no per-framework source plugins yet.
+- CSS nesting, `@scope` and CSS-in-JS (styled-components, hashed CSS-module names) aren't edited directly.
+- Text with markup inside it (`Hello <b>world</b>`) is edited part by part, or by your AI agent.
+- Position means **order**, not free drag-and-drop, because free positioning breaks responsive layouts.
+- Proxy mode is tested against a stand-in dev server. Real Vite, Next and Astro projects should work the same way, but they aren't in the automated tests yet.
+
+## Similar tools
+
+Others work on the same idea in different ways:
+
+- [Onlook](https://github.com/onlook-dev/onlook) is a full open-source visual design app for React, Next.js and Tailwind projects.
+- [Replit's Visual Editor](https://docs.replit.com/replitai/visual-editor) writes simple edits straight to code, inside Replit's cloud.
+- [Layrr](https://github.com/narnia-sh/layrr), [PulseDev](https://www.producthunt.com/posts/pulsedev) and [Fronti](https://chromewebstore.google.com/detail/visual-editor-ai/jojjbmgmggenijlkhjeaiodfoggjcjgj) send every click-and-describe change to an AI agent.
+- [Chrome DevTools Workspaces](https://developer.chrome.com/docs/devtools/workspaces) can save CSS edits to local files.
+
+editor-mode aims to be small and safe: it works on any local site, makes simple edits with no AI, turns every save into an undoable git commit, works with any AI agent or none, and only ever touches your own localhost.
+
+## Contributing
+
+Issues and pull requests are welcome. Run the full check before opening a PR:
 
 ```bash
 npm install
@@ -95,10 +152,12 @@ npx playwright install chromium
 npm run check
 ```
 
-`npm run check` runs the unit tests, rebuilds `dist/`, then drives the real overlay in Chromium against a scratch git copy of `examples/charger-site`: live preview, rule editing, inline edits, theme variables, fonts, `<style>` blocks, reordering, undo, the Claude queue, live reload and the uncommitted-work guard. To use an installed Chrome instead of downloading Chromium, run `EM_BROWSER=chrome npm run check`.
+It runs the unit tests, rebuilds `dist/`, and then runs three browser suites, each against a scratch git copy: the static site in `examples/charger-site`, proxy mode against a stand-in dev server, and a Tailwind site. To use your installed Chrome instead of downloading Chromium, run `EM_BROWSER=chrome npm run check`. CI runs the same check on Linux, macOS and Windows for every pull request.
 
-`dist/` is committed so the plugin runs without an install: run `npm run build` after changing `src/` or `client/`. How it works inside: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+`dist/` is committed so the tool runs without an install, so run `npm run build` after changing `src/` or `client/`.
+
+Found a security problem? Please report it privately through [Security → Report a vulnerability](https://github.com/musahyderr/editor-mode/security/advisories/new) rather than in a public issue.
 
 ## License
 
-MIT
+[MIT](LICENSE)

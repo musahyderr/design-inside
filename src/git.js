@@ -7,8 +7,9 @@ import { promisify } from 'node:util';
 
 const run = promisify(execFile);
 export const PREFIX = 'editor-mode: ';
-// Our commits, Claude's commits from /editor-mode:apply, and reverts of either.
-const OURS = /^(Revert ")?editor-mode( \(claude\))?: /;
+// Our commits, an AI agent's commits for queued requests ("editor-mode (ai): …",
+// or "(claude)" from /editor-mode:apply), and reverts of either.
+const OURS = /^(Revert ")?editor-mode( \([a-z0-9-]+\))?: /;
 
 async function git(root, args) {
   const { stdout } = await run('git', args, { cwd: root, maxBuffer: 10 * 1024 * 1024 });

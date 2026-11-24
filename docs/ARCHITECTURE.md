@@ -5,7 +5,7 @@ Notes for contributors: the design rules, then how a clicked element is matched 
 ## Design
 
 ### Intent
-People generate sites with Claude and then dislike one small thing (a color, a size, some text, a font). editor-mode lets them click the thing, change it visually, and have the real source updated and committed. Simple changes cost zero AI tokens; anything else is handed to Claude with full context.
+People generate sites with AI and then dislike one small thing (a color, a size, some text, a font). editor-mode lets them click the thing, change it visually, and have the real source updated and committed. Simple changes cost zero AI tokens; anything else is handed to an AI coding agent with full context.
 
 ### Goals
 - Turn on with one command (`/editor-mode:start`) on any localhost: plain folder (static) or a running dev server (proxy).
@@ -23,17 +23,17 @@ People generate sites with Claude and then dislike one small thing (a color, a s
 - `/__em/apply` takes a batch of changes, computes all new file contents in memory, refuses if any target file is dirty in git, writes, then commits only those files.
 - Change kinds: `text`, `text-search`, `inline`, `class`, `class-search`, `css-rule`, `css-new-rule`, `css-var`, `font-link` (optional), `move`.
 - After a save the page reloads, so what you see is what's in the file. The selection and scroll position are restored from sessionStorage.
-- Per-directory `fs.watch` sends SSE so the page reloads when Claude edits files. The editor's own writes are suppressed for 1.5 s.
-- Ask Claude appends to `.editor-mode/requests.md` (git-excluded); `/editor-mode:apply` consumes it, one commit per request (`editor-mode (claude): …`).
+- Per-directory `fs.watch` sends SSE so the page reloads when an AI agent edits files. The editor's own writes are suppressed for 1.5 s.
+- Ask AI appends to `.editor-mode/requests.md` (git-excluded). The file starts with instructions, so any AI coding agent can apply it (Claude Code: `/editor-mode:apply`), one commit per request (`editor-mode (ai): …`).
 
 ### Safety rules
-- Refuse rather than guess: stale text or class, element tag mismatch, zero or several search hits. Each refusal offers "Hand to Claude".
+- Refuse rather than guess: stale text or class, element tag mismatch, zero or several search hits. Each refusal offers "Hand to AI".
 - Minimal diffs: HTML byte-range splices; CSS through postcss with untouched formatting.
 - Writes only inside the root; never `.git` or `node_modules`.
-- Undo only reverts editor-mode or Claude-from-editor commits and aborts cleanly on conflict.
+- Undo only reverts editor-mode commits, or AI-agent commits for queued requests, and aborts cleanly on conflict.
 
 ### Known limits
-- Non-Tailwind framework components: styling goes to Claude.
+- Non-Tailwind framework components: styling goes to the AI agent.
 - CSS nesting, `@scope`, CSS-in-JS and CSS-module hashes aren't edited directly.
 - Text with inline markup is edited part by part.
 - Position means order only, no drag.
@@ -59,8 +59,8 @@ All of this runs in the browser (`client/overlay.js`), because the browser alrea
 - Anything else (e.g. Tailwind CDN's generated styles) → unmappable.
 
 ### 4. Choose the target by scope (`plan`)
-- **Just this one:** Tailwind element → class swap on this element. Winning rule matches only this element → edit that rule. Source-mapped → inline `style`. Otherwise → Claude.
-- **All similar:** Tailwind → class swap on every element with the identical class string (or a unique search hit). Winning rule mappable → edit it, or edit the `:root` variable if the value is `var(--x)` and the user ticked the variable. No rule → add `.class.list { prop: value }` to the most relevant sheet. Otherwise → Claude.
+- **Just this one:** Tailwind element → class swap on this element. Winning rule matches only this element → edit that rule. Source-mapped → inline `style`. Otherwise → AI agent.
+- **All similar:** Tailwind → class swap on every element with the identical class string (or a unique search hit). Winning rule mappable → edit it, or edit the `:root` variable if the value is `var(--x)` and the user ticked the variable. No rule → add `.class.list { prop: value }` to the most relevant sheet. Otherwise → AI agent.
 - The pending list shows the chosen destination and how many elements it affects before saving.
 
 ### 5. Server edit details (`src/css.js`)

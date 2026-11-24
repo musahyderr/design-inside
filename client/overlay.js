@@ -245,7 +245,7 @@ import { STYLES } from './styles.js';
         }
       }
       if (loc) return { change: { kind: 'inline', loc, prop, value }, where: `inline style on this <${loc.tag}> in ${loc.file}`, affected: [el] };
-      return { fallback: 'This element is rendered by a framework and has no source mapping, so only Claude can place a one-off style safely.', affected: [el] };
+      return { fallback: 'This element is rendered by a framework and has no source mapping, so only your AI agent can place a one-off style safely.', affected: [el] };
     }
 
     // scope === 'all'
@@ -335,7 +335,7 @@ import { STYLES } from './styles.js';
       }
     }
     if (blocked.length) {
-      for (const b of blocked) await askClaude(`set ${b.prop} to ${b.value} on ${st.scope === 'all' ? 'all elements like' : 'this'} ${describe(b.el)}`, b.el, b.fallback, true);
+      for (const b of blocked) await askAI(`set ${b.prop} to ${b.value} on ${st.scope === 'all' ? 'all elements like' : 'this'} ${describe(b.el)}`, b.el, b.fallback, true);
       blocked.forEach((b) => { st.pending.splice(st.pending.indexOf(b), 1); });
     }
     if (!changes.length) { renderPending(); return; }
@@ -361,7 +361,7 @@ import { STYLES } from './styles.js';
     } catch (e) {
       setBusy(false);
       const failed = changes.map((c) => c.label).join('; ');
-      toast(e.message, { kind: 'error', actions: e.data && e.data.fallback ? [{ label: 'Hand to Claude', run: () => askClaude(failed, st.sel, e.message) }] : [] });
+      toast(e.message, { kind: 'error', actions: e.data && e.data.fallback ? [{ label: 'Hand to AI', run: () => askAI(failed, st.sel, e.message) }] : [] });
     }
   }
   function discard() {
@@ -379,7 +379,7 @@ import { STYLES } from './styles.js';
     } catch (e) { toast(e.message, { kind: 'error' }); }
   }
 
-  async function askClaude(request, el, reason, quiet) {
+  async function askAI(request, el, reason, quiet) {
     const target = el || st.sel;
     const styles = {};
     if (target) {
@@ -395,7 +395,7 @@ import { STYLES } from './styles.js';
         styles,
       });
       st.status.pending = (st.status.pending || 0) + 1;
-      toast(`${quiet ? 'Couldn\'t do this directly, so it\'s queued' : 'Queued'} for Claude: “${request}”. Run /editor-mode:apply in Claude Code.`, {
+      toast(`${quiet ? 'Couldn\'t do this directly, so it\'s queued' : 'Queued'} for your AI agent: “${request}”. Ask it to apply .editor-mode/requests.md (Claude Code: /editor-mode:apply), or copy the prompt into any AI chat.`, {
         actions: [{ label: 'Copy prompt', run: () => navigator.clipboard.writeText(r.prompt).then(() => toast('Prompt copied')) }],
       });
       renderDockBadge();
@@ -506,7 +506,7 @@ import { STYLES } from './styles.js';
     if (!isTextLeaf(el)) {
       const leaf = [...el.querySelectorAll('*')].find(isTextLeaf);
       if (!leaf || el.textContent.trim().length === 0) { toast('Double-click directly on a piece of text to edit it.'); return; }
-      if (el.children.length) { toast('This text contains other elements (links, bold…). Edit each part separately, or ask Claude.'); pick(el); return; }
+      if (el.children.length) { toast('This text contains other elements (links, bold…). Edit each part separately, or ask AI.'); pick(el); return; }
     }
     pick(el);
     st.editing = { el, before: el.textContent };
@@ -599,7 +599,7 @@ import { STYLES } from './styles.js';
       </header>
       <nav class="tabs">
         <button data-tab="style" class="${st.tab === 'style' ? 'on' : ''}">Design</button>
-        <button data-tab="claude" class="${st.tab === 'claude' ? 'on' : ''}">Ask Claude${st.status.pending ? ` <b>${st.status.pending}</b>` : ''}</button>
+        <button data-tab="claude" class="${st.tab === 'claude' ? 'on' : ''}">Ask AI${st.status.pending ? ` <b>${st.status.pending}</b>` : ''}</button>
         <button data-tab="history" class="${st.tab === 'history' ? 'on' : ''}">History</button>
       </nav>
       ${!st.status.git ? `<div class="warn">Undo needs git, and this folder isn't a repository yet. <button class="mini gitinit">Turn on undo</button></div>` : ''}
@@ -653,14 +653,14 @@ import { STYLES } from './styles.js';
               <button class="move" data-dir="down" ${idx < 0 || idx >= sibs.length - 1 || !loc ? 'disabled' : ''} title="Move after the next item">↓ Later</button>
             </div>
           </div>
-          ${!loc ? `<p class="hint">Reordering needs a source-mapped page. Ask Claude instead.</p>` : ''}
+          ${!loc ? `<p class="hint">Reordering needs a source-mapped page. Ask AI instead.</p>` : ''}
         </section>
       ` : st.tab === 'claude' ? `
         <section>
           <h4>Describe a change</h4>
-          <p class="hint">For anything the panel can't do (layout, new sections, hover effects, React components). It's queued in <code>.editor-mode/requests.md</code> with this element's source location and styles. Run <code>/editor-mode:apply</code> in Claude Code.</p>
+          <p class="hint">For anything the panel can't do (layout, new sections, hover effects, React components). It's queued in <code>.editor-mode/requests.md</code> with this element's source location and styles. Then ask your AI coding agent (Claude Code, Gemini CLI, Codex, Cursor…) to "apply .editor-mode/requests.md"; in Claude Code that's <code>/editor-mode:apply</code>.</p>
           <textarea class="ask" placeholder="e.g. make this card's image zoom slightly on hover"></textarea>
-          <button class="primary send">Queue for Claude</button>
+          <button class="primary send">Queue for AI</button>
         </section>
       ` : `<section class="history"><h4>Recent commits</h4><div class="hist">Loading…</div></section>`}
       </div>
@@ -695,7 +695,7 @@ import { STYLES } from './styles.js';
       return;
     }
     foot.innerHTML = `
-      <ol>${st.pending.map((p, i) => `<li class="${p.fallback ? 'fb' : ''}"><div><b>${esc(p.label)}</b><small>${p.fallback ? '→ will be handed to Claude' : `→ ${esc(p.where)}${p.affected && p.affected.length > 1 ? ` · ${p.affected.length} elements` : ''}`}</small></div><button class="ghost drop" data-i="${i}" title="Remove">✕</button></li>`).join('')}</ol>
+      <ol>${st.pending.map((p, i) => `<li class="${p.fallback ? 'fb' : ''}"><div><b>${esc(p.label)}</b><small>${p.fallback ? '→ will be handed to your AI agent' : `→ ${esc(p.where)}${p.affected && p.affected.length > 1 ? ` · ${p.affected.length} elements` : ''}`}</small></div><button class="ghost drop" data-i="${i}" title="Remove">✕</button></li>`).join('')}</ol>
       <div class="actions"><button class="ghost discard">Discard</button><button class="primary save">Save & commit <kbd>⌘S</kbd></button></div>`;
   }
   function renderDockBadge() {
@@ -726,7 +726,7 @@ import { STYLES } from './styles.js';
     if (b.classList.contains('gitinit')) return call('git-init', {}).then(() => { st.status.git = true; renderPanel(); toast('Git is on. Every save is now a commit you can undo.'); });
     if (b.classList.contains('send')) {
       const t = panel.querySelector('.ask').value.trim();
-      if (t) { askClaude(t, st.sel); panel.querySelector('.ask').value = ''; }
+      if (t) { askAI(t, st.sel); panel.querySelector('.ask').value = ''; }
     }
   });
   panel.addEventListener('input', (e) => {

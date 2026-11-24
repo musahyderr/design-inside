@@ -84,3 +84,18 @@ test('search finds plain text exactly once (framework pages)', () => {
     assert.equal(r.content, 'export default () => <p>Hello</p>;\n');
   } finally { fs.rmSync(d, { recursive: true, force: true }); }
 });
+
+test('commits by any AI agent for queued requests count as undoable editor commits', async () => {
+  const G = await import('../src/git.js');
+  const { execSync } = await import('node:child_process');
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'em-git-'));
+  try {
+    const git = (a) => execSync(`git -c user.name=t -c user.email=t@localhost ${a}`, { cwd: d, stdio: 'pipe' });
+    git('init -q -b main');
+    for (const m of ['user work', 'editor-mode: color', 'editor-mode (claude): hover', 'editor-mode (ai): shadow']) {
+      fs.writeFileSync(path.join(d, 'f.txt'), m); git('add -A'); git(`commit -qm "${m}"`);
+    }
+    const ours = Object.fromEntries((await G.history(d)).map((c) => [c.subject || c.message, c.ours]));
+    assert.deepEqual(ours, { 'editor-mode (ai): shadow': true, 'editor-mode (claude): hover': true, 'editor-mode: color': true, 'user work': false });
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});

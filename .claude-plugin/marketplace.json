@@ -1,11 +1,14 @@
 {
   "name": "editor-mode",
-  "owner": { "name": "editor-mode contributors" },
+  "description": "editor-mode: a visual editor for sites on your own localhost that writes changes into your source files and commits them.",
+  "owner": {
+    "name": "editor-mode contributors"
+  },
   "plugins": [
     {
       "name": "editor-mode",
       "source": "./",
-      "description": "Click-to-edit visual editor for localhost sites, with git commits and a Claude hand-off for complex changes."
+      "description": "Click-to-edit visual editor for localhost sites, with git commits and an AI hand-off for complex changes."
     }
   ]
 }
