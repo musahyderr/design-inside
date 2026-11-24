@@ -52,6 +52,8 @@ Put the panel wherever it suits you. Use **⇱** to dock it **left, top, center 
 | **Text box.** Type new text in the panel, or double-click it on the page. | **Theme colors.** Change a color everywhere through its `--variable`, or only here. |
 | ![History tab: every save is a commit with an Undo button](docs/screenshots/history.png) | ![Ask AI tab: a request is queued for an AI agent, with a Copy prompt button](docs/screenshots/ask-ai.png) |
 | **History.** Every save is a git commit with one-click **Undo**. | **Ask AI.** Anything the panel can't do goes to your AI agent, with the exact source location. |
+| ![Dark mode: the same panel as frosted dark glass](docs/screenshots/panel-dark.png) | ![Crop window: choose a shape, rotate, and see the final size](docs/screenshots/crop.png) |
+| **Light and dark.** The panel follows your computer's appearance, like an Apple app. | **Crop images.** Free, 1:1, 4:3, 16:9 or Original, with rotate. |
 
 ## What it does
 

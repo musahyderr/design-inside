@@ -674,7 +674,7 @@ import { STYLES } from './styles.js';
         <div class="crumb">
           ${el.parentElement && el.parentElement !== document.body ? `<button class="ghost up" title="Select parent">↖</button>` : ''}
           <div>
-            <div class="name"><span class="kind">${esc(k.label)}</span> ${esc(describe(el))}</div>
+            <div class="name"><span class="kind">${esc(k.label)}</span> <span class="sel-name">${esc(describe(el))}</span></div>
             <div class="src">${loc ? `${esc(loc.file)} · source-mapped` : tw ? 'Tailwind · found by search' : 'rendered by your framework'}</div>
           </div>
         </div>
@@ -723,7 +723,7 @@ import { STYLES } from './styles.js';
         <section>
           <h4>${k.media ? 'Shape' : 'Fill & shape'}</h4>
           ${k.media ? '' : `<label class="row"><span>Background</span>${colorInput('background-color', rgbToHex(cs.backgroundColor), varOf(bgVal))}</label>`}
-          ${!k.media && loc ? `<div class="row"><span>Image</span><button class="mini pick-image" data-target="bg-image">Background image…</button></div>` : ''}
+          ${!k.media && loc ? `<div class="row"><span>Image</span><button class="mini pick-image" data-target="bg-image" title="Choose a background image">Choose…</button></div>` : ''}
           <label class="row"><span>Corners</span><input data-prop="border-radius" value="${esc(current(el, 'border-radius') || cs.borderRadius)}"></label>
         </section>
         <section>
@@ -795,7 +795,7 @@ import { STYLES } from './styles.js';
     if (k.inline) return '';
     const shadowNow = shadowPresetOf(cs);
     const op = Math.round(parseFloat(cs.opacity) * 100);
-    const range = (attrs, v, max) => `<span class="range"><input type="range" min="0" max="${max}" step="5" ${attrs} value="${v}"><output>${v}%</output></span>`;
+    const range = (attrs, v, max) => `<span class="range"><input type="range" min="0" max="${max}" step="5" ${attrs} value="${v}" style="--p: ${(v / max) * 100}%"><output>${v}%</output></span>`;
     let rows = `
       <label class="row"><span>Shadow</span><select data-fx="shadow">${shadowNow === 'custom' ? '<option selected disabled>Custom</option>' : ''}${Object.entries(SHADOWS).map(([key, [label]]) => `<option value="${key}" ${key === shadowNow ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
       <label class="row"><span>Opacity</span>${range('data-fx="opacity"', op, 100)}</label>`;
@@ -822,7 +822,7 @@ import { STYLES } from './styles.js';
     const f = t.dataset && t.dataset.fx;
     if (!f) return false;
     const out = t.nextElementSibling && t.nextElementSibling.tagName === 'OUTPUT' ? t.nextElementSibling : null;
-    if (out) out.textContent = `${t.value}%`;
+    if (out) { out.textContent = `${t.value}%`; t.style.setProperty('--p', `${(t.value / t.max) * 100}%`); }
     if (f === 'shadow' && !live) stage('box-shadow', SHADOWS[t.value][1], `shadow → ${SHADOWS[t.value][0]}`);
     else if (f === 'opacity') stage('opacity', String(+t.value / 100), `opacity → ${t.value}%`);
     else if (f === 'filter') {

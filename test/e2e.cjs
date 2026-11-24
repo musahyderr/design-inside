@@ -210,7 +210,9 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await page.mouse.move(edge2.x - 600, edge2.y + 40, { steps: 6 });
   await page.mouse.up();
   check(Math.round((await box()).w) === 236, `the panel stops at its minimum width (${Math.round((await box()).w)}px)`);
-  check((await ui('.body').evaluate((b) => getComputedStyle(b).scrollbarColor)).includes('rgb(46, 46, 54)'), 'the panel uses a dark scrollbar');
+  const thumb = await ui('.body').evaluate((b) => getComputedStyle(b).scrollbarColor);
+  const [tr, tg, tb] = (thumb.match(/\d+(\.\d+)?/g) || []).map(Number);
+  check(Math.max(tr, tg, tb) <= 70, `the panel uses a dark scrollbar (${thumb})`);
   const tall = await box();
   const eb = await ui('.edge-b').boundingBox();
   await page.mouse.move(eb.x + eb.width / 2, eb.y + 4);
