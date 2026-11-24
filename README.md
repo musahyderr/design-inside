@@ -4,7 +4,8 @@
 
 <p align="center">
   <a href="https://github.com/musahyderr/designinside/actions/workflows/check.yml"><img alt="check" src="https://github.com/musahyderr/designinside/actions/workflows/check.yml/badge.svg"></a>
-  <img alt="tested on Linux, macOS and Windows" src="https://img.shields.io/badge/tested%20on-Linux%20%7C%20macOS%20%7C%20Windows-informational">
+  <a href="#verification"><img alt="tested on Linux, macOS and Windows" src="https://img.shields.io/badge/tested%20on-Linux%20%7C%20macOS%20%7C%20Windows-informational"></a>
+  <a href="#verification"><img alt="90 checks" src="https://img.shields.io/badge/checks-35%20unit%20%2B%2055%20browser-success"></a>
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%3E%3D22-339933">
   <img alt="works with any AI agent" src="https://img.shields.io/badge/AI%20agent-any%20(or%20none)-8b5cf6">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
@@ -99,6 +100,40 @@ No coding agent? Click **Copy prompt** on the toast and paste it into any AI cha
 - **It never commits over your work.** If a file it needs has uncommitted changes, it won't touch that file.
 - **Minimal diffs.** HTML edits are byte-range splices and CSS goes through postcss, so changing one color is a one-line diff. Windows (CRLF) line endings are kept.
 - **Only inside the project folder.** It never touches `.git`, `node_modules` or dotfiles such as `.env`, which are never served either. Edited values are checked so they can't break out of the CSS or HTML they go into.
+
+## Verification
+
+[![check](https://github.com/musahyderr/designinside/actions/workflows/check.yml/badge.svg)](https://github.com/musahyderr/designinside/actions/workflows/check.yml)
+
+Every pull request and every change to `main` runs the full test suite in CI. A branch ruleset blocks any change to `main` that doesn't pass on all four platforms below. You can re-run every check yourself with `npm run check`, and the results of every run are public in [Actions](https://github.com/musahyderr/designinside/actions/workflows/check.yml).
+
+| Platform | Node.js | Required to merge |
+|---|---|---|
+| Ubuntu (Linux) | 22 | ✅ |
+| macOS | 22 | ✅ |
+| Windows | 22 | ✅ |
+| Ubuntu (Linux) | 24 | ✅ |
+
+**What runs on each platform**
+
+| Suite | Checks | What it proves |
+|---|---|---|
+| Unit tests | 35 | Source editing (HTML, CSS, `<style>` blocks, Tailwind), Windows line endings are kept, framework text search, git history and undo, and the security rules |
+| Browser: static site | 41 | The real panel in Chromium: live preview, cascade-aware rule edits, inline edits, theme variables, fonts, Text box, reordering, undo, Ask AI queue, live reload, refusing to commit over your work, element-aware controls, outline position while scrolling |
+| Browser: proxy mode | 9 | Wrapping a dev server: source-mapped HTML, JavaScript-rendered text, CSS rules, and hot-reload WebSocket passthrough |
+| Browser: Tailwind | 5 | Panel changes become utility-class swaps, and unrelated classes are kept |
+| Dependency audit | `npm audit` | No known vulnerabilities in runtime dependencies |
+| Build check | `git diff dist/` | The shipped `dist/` bundle is exactly what the source builds to |
+
+**Security tests** (`test/security.test.js`) confirm that the server:
+
+- refuses requests from other websites, and non-JSON writes;
+- refuses any `Host` that isn't localhost, which blocks DNS rebinding;
+- never serves `.env` or other dotfiles;
+- refuses `--proxy` targets that aren't on your own computer;
+- rejects edit values that try to break out of CSS or HTML.
+
+Four of these tests failed before the security fix, which shows they catch real problems.
 
 ## How it works
 
