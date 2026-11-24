@@ -24,14 +24,15 @@ for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (a === '-h' || a === '--help') { console.log(HELP); process.exit(0); }
   else if (a === '--port') opt.port = Number(args[++i]);
-  else if (a === '--proxy') { const v = args[++i]; opt.proxy = /^\d+$/.test(v) ? `http://localhost:${v}` : v; }
+  else if (a === '--proxy') { const v = args[++i]; opt.proxy = /^\d+$/.test(v) ? `http://localhost:${v}` : /^[a-z]+:\/\//i.test(v || '') ? v : `http://${v}`; }
   else if (a === '--no-git-check') opt.noGit = true;
   else opt.root = a;
 }
 const root = path.resolve(opt.root);
 if (!fs.existsSync(root)) { console.error(`No such folder: ${root}`); process.exit(1); }
 
-const { server } = createServer({ root, proxy: opt.proxy });
+let server;
+try { ({ server } = createServer({ root, proxy: opt.proxy })); } catch (e) { console.error(e.message); process.exit(1); }
 const listen = (port, tries = 10) => {
   server.once('error', (e) => {
     if (e.code === 'EADDRINUSE' && tries > 0) return listen(port + 1, tries - 1);

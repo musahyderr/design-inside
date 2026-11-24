@@ -90,3 +90,9 @@ test('edits cannot smuggle markup or extra CSS', () => {
   ];
   for (const ch of good) assert.doesNotThrow(() => validateChange(ch), JSON.stringify(ch));
 });
+
+test('proxy mode only wraps a dev server on this computer', () => {
+  for (const bad of ['https://example.com', 'http://192.168.1.20:3000', 'http://localhost.evil.example:5173', 'file:///etc', 'not a url']) {
+    assert.throws(() => createServer({ root: os.tmpdir(), proxy: bad, log: () => {} }), /only wraps|needs a URL/, bad);
+  }
+});

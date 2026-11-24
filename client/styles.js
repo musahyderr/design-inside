@@ -9,7 +9,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 kbd { font: 10px/1 ui-monospace, monospace; padding: 3px 5px; border-radius: 4px; background: rgba(255,255,255,.1); color: var(--dim); }
 code { font: 11px ui-monospace, SFMono-Regular, monospace; background: var(--bg3); padding: 1px 4px; border-radius: 4px; }
 
-.hl { position: fixed; pointer-events: none; border-radius: 2px; transition: all .06s ease-out; }
+.hl { position: fixed; pointer-events: none; border-radius: 2px; } /* no transition: a sliding box lags behind the page while scrolling */
 .hl.hover { outline: 1.5px dashed var(--hov); background: rgba(56,189,248,.06); }
 .hl.selected { outline: 2px solid var(--sel); box-shadow: 0 0 0 4px rgba(139,123,255,.18); }
 .hl.affected { outline: 1.5px solid rgba(139,123,255,.55); background: rgba(139,123,255,.06); }

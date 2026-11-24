@@ -19,6 +19,13 @@ const MIME = {
 
 export function createServer({ root, proxy = null, log = console.log }) {
   root = path.resolve(root);
+  // editor-mode edits the user's own site only: it wraps dev servers on this machine, never a remote site.
+  if (proxy) {
+    let u; try { u = new URL(proxy); } catch { throw new Error(`--proxy needs a URL or port, got "${proxy}".`); }
+    if (!/^https?:$/.test(u.protocol) || !/^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/i.test(u.hostname)) {
+      throw new Error(`editor-mode only wraps a dev server on this computer (localhost), not ${u.host}.`);
+    }
+  }
   const overlayPath = [path.join(here, 'overlay.js'), path.join(here, '..', 'dist', 'overlay.js')].find((p) => fs.existsSync(p));
   const recentWrites = new Map(); // file -> timestamp, to ignore our own writes in the watcher
   const clients = new Set();

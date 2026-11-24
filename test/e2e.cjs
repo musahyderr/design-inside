@@ -155,6 +155,18 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await ui('.discard').click();
   await page.evaluate(() => { document.getElementById('em-test-img').remove(); document.getElementById('em-test-inline').remove(); });
 
+  // 9c. the selection outline stays on the element while the page scrolls
+  await page.click('.card .btn');
+  await page.mouse.move(300, 300);
+  await page.mouse.wheel(0, 150);
+  await page.waitForTimeout(25);
+  const drift = await page.evaluate(() => {
+    const r = document.querySelector('.card .btn').getBoundingClientRect();
+    const boxes = [...document.querySelector('editor-mode-root').shadowRoot.querySelectorAll('.hl')].map((x) => x.getBoundingClientRect()).filter((x) => x.width > 0);
+    return Math.min(...boxes.map((x) => Math.abs(x.top - r.top)));
+  });
+  check(drift <= 1, `selection outline follows the element while scrolling (off by ${Math.round(drift)}px)`);
+
   // 10. ask Claude for something the panel can't do
   await page.click('.card.featured', { position: { x: 8, y: 8 } });
   await ui('[data-tab="claude"]').click();

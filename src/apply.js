@@ -28,6 +28,13 @@ export function validateChange(ch) {
   if (ch.kind === 'font-link' && !(typeof ch.family === 'string' && /^[A-Za-z0-9 ]{1,60}$/.test(ch.family))) bad('font name');
 }
 
+// Windows files use CRLF. Parsers and our own inserts produce \n, so give the
+// written file the same line endings it had (only when it was consistently CRLF).
+export function matchEol(before, after) {
+  if (!before || !before.includes('\r\n') || /(^|[^\r])\n/.test(before)) return after;
+  return after.replace(/\r?\n/g, '\r\n');
+}
+
 export async function applyPlan({ root, inRoot, rel, resolveSheet, pageUrl, changes }) {
   if (!Array.isArray(changes)) throw new H.EditError('Invalid change list: not allowed in an editor-mode change.', 400);
   changes.forEach(validateChange);
@@ -145,7 +152,10 @@ export async function applyPlan({ root, inRoot, rel, resolveSheet, pageUrl, chan
   }
 
   const writes = {};
-  for (const [abs, content] of files) if (content !== original.get(abs)) writes[abs] = content;
+  for (const [abs, content] of files) {
+    const out = matchEol(original.get(abs), content);
+    if (out !== original.get(abs)) writes[abs] = out;
+  }
   return { writes, results, reload };
 }
 
@@ -154,7 +164,8 @@ export async function applyPlan({ root, inRoot, rel, resolveSheet, pageUrl, chan
 // place, refuse; guessing is how files get corrupted.
 export function searchReplace(root, needle, replacement, get, { mode }) {
   if (!needle) throw new H.EditError('Nothing to search for.', 400);
-  const variants = mode === 'text' ? [needle, H.escapeText(needle)] : [needle];
+  // Raw and HTML-escaped forms; usually identical, so de-duplicate or every hit counts twice.
+  const variants = mode === 'text' ? [...new Set([needle, H.escapeText(needle)])] : [needle];
   const hits = [];
   const walkDir = (dir) => {
     for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {

@@ -15516,6 +15516,10 @@ function validateChange(ch) {
   if (ch.kind === "css-var" && !(typeof ch.name === "string" && /^--[\w-]+$/.test(ch.name))) bad("variable name");
   if (ch.kind === "font-link" && !(typeof ch.family === "string" && /^[A-Za-z0-9 ]{1,60}$/.test(ch.family))) bad("font name");
 }
+function matchEol(before, after) {
+  if (!before || !before.includes("\r\n") || /(^|[^\r])\n/.test(before)) return after;
+  return after.replace(/\r?\n/g, "\r\n");
+}
 async function applyPlan({ root: root3, inRoot, rel, resolveSheet, pageUrl, changes }) {
   if (!Array.isArray(changes)) throw new EditError("Invalid change list: not allowed in an editor-mode change.", 400);
   changes.forEach(validateChange);
@@ -15642,12 +15646,15 @@ async function applyPlan({ root: root3, inRoot, rel, resolveSheet, pageUrl, chan
     }
   }
   const writes = {};
-  for (const [abs, content] of files) if (content !== original.get(abs)) writes[abs] = content;
+  for (const [abs, content] of files) {
+    const out = matchEol(original.get(abs), content);
+    if (out !== original.get(abs)) writes[abs] = out;
+  }
   return { writes, results, reload };
 }
 function searchReplace(root3, needle, replacement, get, { mode }) {
   if (!needle) throw new EditError("Nothing to search for.", 400);
-  const variants = mode === "text" ? [needle, escapeText(needle)] : [needle];
+  const variants = mode === "text" ? [.../* @__PURE__ */ new Set([needle, escapeText(needle)])] : [needle];
   const hits = [];
   const walkDir = (dir) => {
     for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -15713,6 +15720,17 @@ var MIME = {
 };
 function createServer({ root: root3, proxy = null, log = console.log }) {
   root3 = path2.resolve(root3);
+  if (proxy) {
+    let u;
+    try {
+      u = new URL(proxy);
+    } catch {
+      throw new Error(`--proxy needs a URL or port, got "${proxy}".`);
+    }
+    if (!/^https?:$/.test(u.protocol) || !/^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/i.test(u.hostname)) {
+      throw new Error(`editor-mode only wraps a dev server on this computer (localhost), not ${u.host}.`);
+    }
+  }
   const overlayPath = [path2.join(here, "overlay.js"), path2.join(here, "..", "dist", "overlay.js")].find((p) => fs2.existsSync(p));
   const recentWrites = /* @__PURE__ */ new Map();
   const clients = /* @__PURE__ */ new Set();
@@ -16050,7 +16068,7 @@ for (let i = 0; i < args.length; i++) {
   } else if (a === "--port") opt.port = Number(args[++i]);
   else if (a === "--proxy") {
     const v = args[++i];
-    opt.proxy = /^\d+$/.test(v) ? `http://localhost:${v}` : v;
+    opt.proxy = /^\d+$/.test(v) ? `http://localhost:${v}` : /^[a-z]+:\/\//i.test(v || "") ? v : `http://${v}`;
   } else if (a === "--no-git-check") opt.noGit = true;
   else opt.root = a;
 }
@@ -16059,7 +16077,13 @@ if (!fs3.existsSync(root2)) {
   console.error(`No such folder: ${root2}`);
   process.exit(1);
 }
-var { server } = createServer({ root: root2, proxy: opt.proxy });
+var server;
+try {
+  ({ server } = createServer({ root: root2, proxy: opt.proxy }));
+} catch (e) {
+  console.error(e.message);
+  process.exit(1);
+}
 var listen = (port, tries = 10) => {
   server.once("error", (e) => {
     if (e.code === "EADDRINUSE" && tries > 0) return listen(port + 1, tries - 1);

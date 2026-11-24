@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Verify a change: unit tests, build, then the browser e2e on a throwaway git
-# copy of examples/charger-site. Exit code 0 = safe to commit.
+# Verify a change: unit tests, build, then three browser e2e suites, each on a
+# throwaway git copy of its site. Exit code 0 = safe to commit.
 #   npm run check                      (uses Playwright's Chromium)
 #   EM_BROWSER=chrome npm run check    (uses your installed Chrome instead)
 set -euo pipefail
@@ -9,17 +9,42 @@ echo "== unit tests"
 node --test test/*.test.js >/dev/null 2>&1 || { node --test test/*.test.js; echo "unit tests failed"; exit 1; }
 echo "ok"
 echo "== build"; npm run build --silent
-SITE="$(mktemp -d)"; PORT=4499
-cp examples/charger-site/* "$SITE"/
-git -C "$SITE" init -q -b main
-git -C "$SITE" config user.name check; git -C "$SITE" config user.email check@localhost
-git -C "$SITE" add -A && git -C "$SITE" commit -qm init
-node dist/editor-mode.mjs "$SITE" --port $PORT >/dev/null 2>&1 & PID=$!
-trap 'kill $PID 2>/dev/null; rm -rf "$SITE"' EXIT
-sleep 1
+
+PIDS=(); DIRS=()
+cleanup() { for p in "${PIDS[@]}"; do kill "$p" 2>/dev/null || true; done; for d in "${DIRS[@]}"; do rm -rf "$d"; done; }
+trap cleanup EXIT
+copy() { # git copy of a fixture folder, printed path
+  local d; d="$(mktemp -d)"; DIRS+=("$d")
+  cp -r "$1"/. "$d"/
+  git -C "$d" init -q -b main
+  git -C "$d" config user.name check; git -C "$d" config user.email check@localhost
+  git -C "$d" add -A && git -C "$d" commit -qm init
+  echo "$d"
+}
+TOTAL_PASS=0; TOTAL_FAIL=0
+suite() { # name, test file, url, site
+  local out pass fail
+  out="$(node "$2" "$3" "$4" 2>&1 || true)"
+  pass=$(grep -c "^✓" <<<"$out" || true); fail=$(grep -cE "^✗|Error" <<<"$out" || true)
+  [ "$pass" -gt 0 ] || fail=$((fail + 1))
+  echo "$1: $pass passed, $fail failed"
+  [ "$fail" = 0 ] || grep -E "^✗|Error" <<<"$out" | head -20
+  TOTAL_PASS=$((TOTAL_PASS + pass)); TOTAL_FAIL=$((TOTAL_FAIL + fail))
+}
+
 echo "== browser e2e"
-OUT="$(node test/e2e.cjs "http://localhost:$PORT" "$SITE" 2>&1 || true)"
-PASS=$(grep -c "^✓" <<<"$OUT" || true); FAIL=$(grep -cE "^✗|Error" <<<"$OUT" || true)
-echo "$PASS passed, $FAIL failed"
-[ "$FAIL" = 0 ] && [ "$PASS" -gt 0 ] || { grep -E "^✗|Error" <<<"$OUT" | head -20; exit 1; }
+SITE="$(copy examples/charger-site)"
+node dist/editor-mode.mjs "$SITE" --port 4499 >/dev/null 2>&1 & PIDS+=($!)
+APP="$(copy test/fixtures/proxy-app)"
+node test/fixtures/devserver.cjs "$APP" 4496 & PIDS+=($!)
+node dist/editor-mode.mjs --proxy 4496 "$APP" --port 4495 >/dev/null 2>&1 & PIDS+=($!)
+TW="$(copy test/fixtures/tailwind-site)"
+node dist/editor-mode.mjs "$TW" --port 4494 >/dev/null 2>&1 & PIDS+=($!)
+sleep 1.5
+
+suite "static site" test/e2e.cjs http://localhost:4499 "$SITE"
+suite "proxy mode" test/e2e-proxy.cjs http://localhost:4495 "$APP"
+suite "tailwind" test/e2e-tailwind.cjs http://localhost:4494 "$TW"
+echo "total: $TOTAL_PASS passed, $TOTAL_FAIL failed"
+[ "$TOTAL_FAIL" = 0 ] || exit 1
 echo "== OK"
