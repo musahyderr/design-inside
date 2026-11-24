@@ -118,6 +118,43 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   check(order2.join() === 'Pocket,Everyday,Studio', 'undo reverts the reorder with a revert commit');
   check(log()[0].startsWith('Revert "editor-mode: move'), `history kept: "${log()[0]}"`);
 
+  // 9b. the panel adapts to what you click, and has a Text box
+  await page.click('.lede');
+  await ui('[data-tab="style"]').click();
+  check((await ui('.kind').textContent()) === 'Paragraph', 'panel labels a <p> as Paragraph');
+  check(await ui('[data-text]').isVisible(), 'text element shows a Text box in the panel');
+  check(await ui('[data-prop="font-family"]').count() === 1, 'text element shows font controls');
+  await ui('[data-text]').fill('Fast charging for every device you own.');
+  await ui('[data-text]').press('Enter');
+  check((await page.textContent('.lede')) === 'Fast charging for every device you own.', 'Text box previews the new text on the page');
+  await waitReload(() => ui('.save').click());
+  check(read('index.html').includes('<p class="lede">Fast charging for every device you own.</p>'), 'Text box writes the new text to index.html');
+  check(log()[0].startsWith('editor-mode:'), `Text box edit is committed: "${log()[0]}"`);
+
+  await page.click('.hero-actions .btn');
+  check((await ui('.kind').textContent()) === 'Button', 'a.btn is labelled Button');
+  await page.click('.card:not(.featured)', { position: { x: 8, y: 8 } });
+  check(await ui('[data-text]').count() === 0, 'a card (box of several texts) has no single Text box');
+  check((await ui('.body').textContent()).includes('Text inside'), 'a card offers "Text inside" styling');
+
+  await page.evaluate(() => {
+    const img = document.createElement('img'); img.id = 'em-test-img'; img.width = 40; img.height = 40;
+    img.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="red"/></svg>');
+    const s = document.createElement('span'); s.id = 'em-test-inline'; s.textContent = 'inline words';
+    document.querySelector('.hero-copy').append(img, s);
+  });
+  await page.click('#em-test-img');
+  check((await ui('.kind').textContent()) === 'Image', 'an <img> is labelled Image');
+  check(await ui('[data-prop="font-family"]').count() === 0 && await ui('[data-prop="background-color"]').count() === 0, 'image hides font, color and background');
+  check(await ui('[data-prop="width"]').count() === 1 && await ui('.keepratio').isChecked(), 'image shows width with Keep proportions on');
+  await ui('[data-prop="width"]').fill('120');
+  await ui('[data-prop="width"]').press('Enter');
+  check(await page.$eval('#em-test-img', (e) => e.style.height) === 'auto', 'Keep proportions sets the other side to auto');
+  await page.click('#em-test-inline');
+  check(await ui('[data-prop="width"]').count() === 0 && await ui('[data-prop="font-family"]').count() === 1, 'inline text hides width/height, keeps font');
+  await ui('.discard').click();
+  await page.evaluate(() => { document.getElementById('em-test-img').remove(); document.getElementById('em-test-inline').remove(); });
+
   // 10. ask Claude for something the panel can't do
   await page.click('.card.featured', { position: { x: 8, y: 8 } });
   await ui('[data-tab="claude"]').click();

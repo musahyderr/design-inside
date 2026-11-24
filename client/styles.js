@@ -57,6 +57,10 @@ select { font-family: inherit; }
 .grid2 .row > input, .grid2 .row > select { max-width: 86px; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 textarea { height: 90px; padding: 8px; resize: vertical; font-family: inherit; font-size: 12.5px; }
+textarea.txt { height: auto; min-height: 34px; margin-bottom: 6px; line-height: 1.4; }
+.kind { font: 600 10.5px system-ui, sans-serif; text-transform: uppercase; letter-spacing: .04em; color: var(--accent2); margin-right: 4px; }
+.check { display: flex; gap: 6px; align-items: center; color: var(--dim); font-size: 12px; margin-top: 6px; }
+.check input { width: auto; height: auto; }
 .color { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; max-width: 190px; }
 .color input[type=color] { width: 28px; height: 28px; padding: 2px; flex: 0 0 28px; }
 .color .hex { width: 86px; }

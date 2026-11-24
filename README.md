@@ -10,7 +10,7 @@ Built for the moment after an AI generates your site and *one thing* is off: a c
 
 | You do | It writes |
 |---|---|
-| Double-click text and type | The text inside that element in your `.html` file |
+| Double-click text, or type in the panel's Text box | The text inside that element in your `.html` file |
 | Change a color, size, padding or corner radius for **all similar** elements | The rule that actually wins the cascade, in its own file, e.g. `.card { … }` in `styles.css`, including rules in `@media` blocks and in `<style>` tags |
 | Change it for **just this one** | An inline `style=""` on that element only. If a rule is used by that element alone, it edits that rule instead |
 | Change a color that comes from `var(--accent)` | You choose: the theme variable in `:root` (changes everywhere) or only this element |

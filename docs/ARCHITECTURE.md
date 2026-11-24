@@ -9,7 +9,7 @@ People generate sites with Claude and then dislike one small thing (a color, a s
 
 ### Goals
 - Turn on with one command (`/editor-mode:start`) on any localhost: plain folder (static) or a running dev server (proxy).
-- Click to select, double-click text to edit, a panel for font, size, weight, color, align, background, corners, width, height, padding, margin, gap and order.
+- Click to select, double-click text (or use the Text box) to edit, a panel that shows only the controls that fit the element (text, image, box, inline text) for font, size, weight, color, align, background, corners, width, height, padding, margin, gap and order.
 - Writes go to the real files and become one git commit each, with revert-based undo.
 
 ### Anti-goals (failure even if it "works")

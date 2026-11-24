@@ -481,6 +481,27 @@ import { STYLES } from './styles.js';
 
   // ---------------------------------------------------------------- inline text editing
   const isTextLeaf = (el) => el.childNodes.length > 0 && [...el.childNodes].every((n) => n.nodeType === 3) && el.textContent.trim().length > 0;
+  // What kind of element is this? Decides which panel controls make sense.
+  const MEDIA = new Set(['img', 'video', 'svg', 'picture', 'canvas', 'iframe']);
+  const FIELD = new Set(['input', 'textarea', 'select']);
+  function kindOf(el, cs) {
+    const tag = el.tagName.toLowerCase();
+    const media = MEDIA.has(tag);
+    const leaf = isTextLeaf(el);
+    const hasText = !media && (FIELD.has(tag) || el.textContent.trim().length > 0);
+    const inline = !media && cs.display === 'inline';
+    const label = media ? { img: 'Image', video: 'Video', svg: 'Icon', picture: 'Image', canvas: 'Canvas', iframe: 'Embed' }[tag]
+      : /^h[1-6]$/.test(tag) ? 'Heading'
+      : tag === 'button' || el.getAttribute('role') === 'button' || (tag === 'a' && /\bbtn|button\b/i.test(el.className)) ? 'Button'
+      : tag === 'a' ? 'Link'
+      : tag === 'p' ? 'Paragraph'
+      : FIELD.has(tag) ? 'Field'
+      : tag === 'li' ? 'List item'
+      : leaf ? 'Text'
+      : /^(section|header|footer|main|nav|aside)$/.test(tag) ? 'Section'
+      : 'Box';
+    return { tag, media, leaf, hasText, inline, label, container: !leaf && !media && el.children.length > 0 };
+  }
   function startText(el) {
     if (!isTextLeaf(el)) {
       const leaf = [...el.querySelectorAll('*')].find(isTextLeaf);
@@ -516,17 +537,23 @@ import { STYLES } from './styles.js';
     if (!el.getAttribute('style')) el.removeAttribute('style');
     if (!el.getAttribute('class')) el.removeAttribute('class');
     el.removeEventListener('keydown', textKeys, true);
-    const after = el.textContent.replace(/\s+/g, ' ').trim();
-    if (after === ed.before.replace(/\s+/g, ' ').trim()) return;
+    stageText(el, ed.before, el.textContent);
+  }
+  // Queue a text change. `before` is the element's original source text (raw).
+  function stageText(el, before, text) {
+    const after = text.replace(/\s+/g, ' ').trim();
+    const ed = { before };
+    st.pending = st.pending.filter((p) => !(p.kind === 'text' && p.el === el));
+    if (after === before.replace(/\s+/g, ' ').trim()) { el.textContent = before; renderPending(); positionBoxes(); return; }
     const loc = locOf(el);
     const short = (s) => (s.length > 40 ? s.slice(0, 37) + '…' : s);
     const entry = {
-      el, kind: 'text', label: `text “${short(ed.before.trim())}” → “${short(after)}”`, preview: [], affected: [],
+      el, kind: 'text', before, label: `text “${short(ed.before.trim())}” → “${short(after)}”`, preview: [], affected: [],
       change: loc ? { kind: 'text', loc, oldText: ed.before, newText: after } : { kind: 'text-search', oldText: ed.before.trim(), newText: after },
       where: loc ? `text of this <${loc.tag}> in ${loc.file}` : 'source file containing this exact text (found by search)',
       undoPreview: () => { el.textContent = ed.before; },
     };
-    st.pending = st.pending.filter((p) => !(p.kind === 'text' && p.el === el));
+    el.textContent = after;
     st.pending.push(entry);
     renderPending();
     positionBoxes();
@@ -557,13 +584,14 @@ import { STYLES } from './styles.js';
     const sibs = parent ? [...parent.children].filter((c) => c !== host) : [];
     const idx = sibs.indexOf(el);
     const flex = /flex|grid/.test(cs.display);
+    const k = kindOf(el, cs);
 
     panel.innerHTML = `
       <header>
         <div class="crumb">
           ${el.parentElement && el.parentElement !== document.body ? `<button class="ghost up" title="Select parent">↖</button>` : ''}
           <div>
-            <div class="name">${esc(describe(el))}</div>
+            <div class="name"><span class="kind">${esc(k.label)}</span> ${esc(describe(el))}</div>
             <div class="src">${loc ? `${esc(loc.file)} · source-mapped` : tw ? 'Tailwind · found by search' : 'rendered by your framework'}</div>
           </div>
         </div>
@@ -581,9 +609,17 @@ import { STYLES } from './styles.js';
           <button data-scope="this" class="${st.scope === 'this' ? 'on' : ''}">Just this one</button>
           <button data-scope="all" class="${st.scope === 'all' ? 'on' : ''}">All ${count} ${esc(sel || 'like it')}</button>
         </div>` : ''}
-        <section>
+        ${k.leaf ? `<section>
           <h4>Text</h4>
-          ${isTextLeaf(el) ? `<p class="hint">Double-click the text on the page to rewrite it.</p>` : ''}
+          <textarea class="txt" data-text rows="${Math.min(4, Math.ceil(el.textContent.trim().length / 32) || 1)}" spellcheck="true">${esc(el.textContent.replace(/\s+/g, ' ').trim())}</textarea>
+          <p class="hint">Press Enter or click away to apply. You can also double-click the text on the page.</p>
+        </section>` : k.hasText && k.container ? `<section>
+          <h4>Text</h4>
+          <p class="hint">This ${esc(k.label.toLowerCase())} holds several pieces of text. Click one to rewrite it, or use ↖ to go up a level.</p>
+        </section>` : ''}
+        ${k.hasText ? `<section>
+          <h4>${k.container ? 'Text inside' : 'Font & color'}</h4>
+          ${k.container ? `<p class="hint">Changes the text style of everything inside, unless a piece sets its own.</p>` : ''}
           <label class="row"><span>Font</span><select data-prop="font-family">${FONTS.map((f) => `<option value="${esc(f.name)}" ${f.name === famNow ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}${FONTS.some((f) => f.name === famNow) ? '' : `<option selected disabled>${esc(famNow)}</option>`}</select></label>
           <div class="grid2">
             <label class="row"><span>Size</span><input data-prop="font-size" value="${esc(current(el, 'font-size') || cs.fontSize)}"></label>
@@ -591,21 +627,23 @@ import { STYLES } from './styles.js';
           </div>
           <label class="row"><span>Color</span>${colorInput('color', rgbToHex(cs.color), varOf(colorVal))}</label>
           <div class="row"><span>Align</span><div class="seg">${['left', 'center', 'right'].map((a) => `<button data-align="${a}" class="${cs.textAlign === a || (a === 'left' && cs.textAlign === 'start') ? 'on' : ''}">${{ left: '⇤', center: '↔', right: '⇥' }[a]}</button>`).join('')}</div></div>
-        </section>
+        </section>` : ''}
         <section>
-          <h4>Fill & shape</h4>
-          <label class="row"><span>Background</span>${colorInput('background-color', rgbToHex(cs.backgroundColor), varOf(bgVal))}</label>
+          <h4>${k.media ? 'Shape' : 'Fill & shape'}</h4>
+          ${k.media ? '' : `<label class="row"><span>Background</span>${colorInput('background-color', rgbToHex(cs.backgroundColor), varOf(bgVal))}</label>`}
           <label class="row"><span>Corners</span><input data-prop="border-radius" value="${esc(current(el, 'border-radius') || cs.borderRadius)}"></label>
         </section>
         <section>
           <h4>Size & spacing</h4>
+          ${k.inline ? `<p class="hint">Width and height don't apply to text that flows inside a line. Use ↖ to size the box around it.</p>` : ''}
           <div class="grid2">
-            <label class="row"><span>Width</span><input data-prop="width" value="${esc(current(el, 'width') || Math.round(el.getBoundingClientRect().width) + 'px')}"></label>
-            <label class="row"><span>Height</span><input data-prop="height" value="${esc(current(el, 'height') || Math.round(el.getBoundingClientRect().height) + 'px')}"></label>
-            <label class="row"><span>Padding</span><input data-prop="padding" value="${esc(current(el, 'padding') || cs.padding)}"></label>
+            ${k.inline ? '' : `<label class="row"><span>Width</span><input data-prop="width" value="${esc(current(el, 'width') || Math.round(el.getBoundingClientRect().width) + 'px')}"></label>
+            <label class="row"><span>Height</span><input data-prop="height" value="${esc(current(el, 'height') || Math.round(el.getBoundingClientRect().height) + 'px')}"></label>`}
+            ${k.media ? '' : `<label class="row"><span>Padding</span><input data-prop="padding" value="${esc(current(el, 'padding') || cs.padding)}"></label>`}
             <label class="row"><span>Margin</span><input data-prop="margin" value="${esc(current(el, 'margin') || cs.margin)}"></label>
             ${flex ? `<label class="row"><span>Gap</span><input data-prop="gap" value="${esc(current(el, 'gap') || cs.gap)}"></label>` : ''}
           </div>
+          ${k.media ? `<label class="check"><input type="checkbox" class="keepratio" ${st.keepRatio !== false ? 'checked' : ''}> Keep proportions</label>` : ''}
         </section>
         <section>
           <h4>Position</h4>
@@ -698,6 +736,12 @@ import { STYLES } from './styles.js';
   panel.addEventListener('change', (e) => {
     const t = e.target;
     if (t.classList.contains('linkvar')) { st.linkVars = t.checked; restage(); return; }
+    if (t.classList.contains('keepratio')) { st.keepRatio = t.checked; return; }
+    if (t.hasAttribute('data-text')) {
+      const p = st.pending.find((x) => x.kind === 'text' && x.el === st.sel);
+      stageText(st.sel, p ? p.before : st.sel.textContent, t.value);
+      return;
+    }
     if (t.dataset.hex) {
       const v = t.value.trim();
       if (/^#?[0-9a-f]{3,8}$/i.test(v)) {
@@ -718,9 +762,14 @@ import { STYLES } from './styles.js';
       return;
     }
     stage(prop, prop === 'font-weight' ? t.value : px(t.value));
+    // Images keep their shape: setting one side lets the other follow.
+    if ((prop === 'width' || prop === 'height') && st.keepRatio !== false && MEDIA.has(st.sel.tagName.toLowerCase())) {
+      stage(prop === 'width' ? 'height' : 'width', 'auto');
+    }
   });
   panel.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.target.dispatchEvent(new Event('change', { bubbles: true }));
+    if (e.key === 'Enter' && e.target.hasAttribute('data-text')) { e.preventDefault(); e.target.blur(); }
     e.stopPropagation();
   });
   const loadFont = (name) => {
