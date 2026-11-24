@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/musahyderr/design-inside/actions/workflows/check.yml"><img alt="check" src="https://github.com/musahyderr/design-inside/actions/workflows/check.yml/badge.svg"></a>
   <a href="#verification"><img alt="tested on Linux, macOS and Windows" src="https://img.shields.io/badge/tested%20on-Linux%20%7C%20macOS%20%7C%20Windows-informational"></a>
-  <a href="#verification"><img alt="112 checks" src="https://img.shields.io/badge/checks-36%20unit%20%2B%2076%20browser-success"></a>
+  <a href="#verification"><img alt="138 checks" src="https://img.shields.io/badge/checks-45%20unit%20%2B%2093%20browser-success"></a>
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%3E%3D22-339933">
   <img alt="works with any AI agent" src="https://img.shields.io/badge/AI%20agent-any%20(or%20none)-8b5cf6">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
@@ -42,6 +42,8 @@ The tool is a single bundled file, so there's nothing to `npm install`. Using Cl
 
 The panel shows only the controls that fit what you clicked. A heading gets text and font controls, an image gets size with *Keep proportions*, and a card gets background, spacing and "Text inside".
 
+Replace an image or give a card a background image, crop it in the browser, and add effects such as shadows, gradients and glass blur.
+
 Put the panel wherever it suits you. Use **⇱** to dock it **left, top, center or right**, drag its top bar to place it anywhere, drag a side or bottom edge (it turns blue) or the corner to resize it, or use **–** to collapse it to its title bar. Stuck somewhere awkward? Double-click the top bar to put it back. The layout is remembered for each site, and **Reset** restores the default.
 
 | | |
@@ -63,6 +65,7 @@ Put the panel wherever it suits you. Use **⇱** to dock it **left, top, center 
 | Resize an image | Width or height, with the other side set to `auto` to keep its proportions |
 | Add effects to a card or box: shadow (Soft, Medium, Strong, Glow), opacity, gradient, border, glass blur | `box-shadow`, `opacity`, `background-image: linear-gradient(…)`, `border` and `backdrop-filter`, to the rule or just this element (Tailwind: `shadow-[…]`, `opacity-[…]`) |
 | Adjust an image: grayscale, brightness, contrast, saturation | One `filter` value, such as `grayscale(100%) contrast(120%)` |
+| Replace an image, or give a card a background image, and crop it (Free, 1:1, 4:3, 16:9, Original, rotate) | A new file in `images/` next to the page, with a name the server chooses (such as `images/laptop-3fa9c2e1.webp`), plus the updated `src` or `background-image`, in one commit. Undo removes both. |
 | Move an item earlier or later | The two elements, swapped in the HTML source |
 | Edit a Tailwind element | Swapped utilities: `text-slate-900 text-2xl` → `text-[#ea580c] text-[32px]` |
 | Ask for anything else ("zoom the image on hover") | A request in `.design-inside/requests.md` with the element's file, selector and styles, for your AI agent |
@@ -104,6 +107,7 @@ No coding agent? Click **Copy prompt** on the toast and paste it into any AI cha
 - **It never commits over your work.** If a file it needs has uncommitted changes, it won't touch that file.
 - **Minimal diffs.** HTML edits are byte-range splices and CSS goes through postcss, so changing one color is a one-line diff. Windows (CRLF) line endings are kept.
 - **Only inside the project folder.** It never touches `.git`, `node_modules` or dotfiles such as `.env`, which are never served either. Edited values are checked so they can't break out of the CSS or HTML they go into.
+- **Only real images get in.** Imported images are re-saved by your browser, which keeps only the pixels and drops hidden data such as a photo's GPS location. The server then checks the bytes again. Only PNG, JPEG, WebP, GIF and AVIF are accepted, identified by their content, not their name. SVG, HTML, scripts and anything with code hidden inside are refused, as are files over **5 MB** and pictures over 8000×8000 pixels. File names are chosen by the server, so nothing can be overwritten or saved outside the project.
 
 ## Verification
 
@@ -122,10 +126,11 @@ Every pull request and every change to `main` runs the full test suite in CI. A 
 
 | Suite | Checks | What it proves |
 |---|---|---|
-| Unit tests | 36 | Source editing (HTML, CSS, `<style>` blocks, Tailwind), Windows line endings are kept, framework text search, git history and undo, and the security rules |
+| Unit tests | 45 | Source editing (HTML, CSS, `<style>` blocks, Tailwind), Windows line endings are kept, framework text search, git history and undo, the security rules, and image checks (formats by content, SVG and hidden code refused, 5 MB and 8000 px limits, safe file names) |
 | Browser: static site | 62 | The real panel in Chromium: effects (shadow, opacity, gradient, border, image filters) saved and committed, moving, docking, resizing and collapsing the panel (and saving while it is moved), live preview, cascade-aware rule edits, inline edits, theme variables, fonts, Text box, reordering, undo, Ask AI queue, live reload, refusing to commit over your work, element-aware controls, outline position while scrolling |
 | Browser: proxy mode | 9 | Wrapping a dev server: source-mapped HTML, JavaScript-rendered text, CSS rules, and hot-reload WebSocket passthrough |
 | Browser: Tailwind | 5 | Panel changes become utility-class swaps, and unrelated classes are kept |
+| Browser: images | 17 | Replace an image and crop it, save as one commit, undo removes the file, card background images, and refusing files over 5 MB, SVGs, fake images and direct requests to the server |
 | Dependency audit | `npm audit` | No known vulnerabilities in runtime dependencies |
 | Build check | `git diff dist/` | The shipped `dist/` bundle is exactly what the source builds to |
 

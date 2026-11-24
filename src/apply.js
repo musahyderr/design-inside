@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as H from './html.js';
 import * as C from './css.js';
+import { checkImage, assetName } from './image.js';
 
 const SOURCE_EXT = new Set(['.html', '.htm', '.jsx', '.tsx', '.js', '.ts', '.vue', '.svelte', '.astro', '.md', '.mdx', '.php', '.erb', '.hbs', '.njk', '.liquid']);
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.nuxt', '.svelte-kit', '.output', '.vercel', 'coverage', '.design-inside', '.astro', 'out']);
@@ -17,7 +18,7 @@ const PROP = /^-{0,2}[a-zA-Z][\w-]*$/;
 const UNSAFE_VALUE = /[;{}<>\\\r\n\0]/;
 const UNSAFE_SELECTOR = /[;{}<>\\\r\n\0]|\/\*/;
 export function validateChange(ch) {
-  const bad = (what) => { throw new H.EditError(`Invalid ${what}: not allowed in an design-inside change.`, 400); };
+  const bad = (what) => { throw new H.EditError(`Invalid ${what}: not allowed in a design-inside change.`, 400); };
   if (!ch || typeof ch !== 'object' || typeof ch.kind !== 'string') bad('change');
   if ('prop' in ch && ch.prop != null && !(typeof ch.prop === 'string' && PROP.test(ch.prop))) bad('property name');
   if (['inline', 'css-rule', 'css-new-rule', 'css-var'].includes(ch.kind)) {
@@ -26,6 +27,11 @@ export function validateChange(ch) {
   if (ch.kind === 'css-new-rule' && (typeof ch.selector !== 'string' || UNSAFE_SELECTOR.test(ch.selector))) bad('selector');
   if (ch.kind === 'css-var' && !(typeof ch.name === 'string' && /^--[\w-]+$/.test(ch.name))) bad('variable name');
   if (ch.kind === 'font-link' && !(typeof ch.family === 'string' && /^[A-Za-z0-9 ]{1,60}$/.test(ch.family))) bad('font name');
+  if (['img-src', 'bg-image'].includes(ch.kind)) {
+    // the image bytes themselves are checked by checkImage(); here only the shape
+    if (!ch.loc || typeof ch.loc.file !== 'string' || typeof ch.loc.path !== 'string') bad('image target');
+    if (ch.name != null && (typeof ch.name !== 'string' || ch.name.length > 200)) bad('image name');
+  }
 }
 
 // Windows files use CRLF. Parsers and our own inserts produce \n, so give the
@@ -36,7 +42,7 @@ export function matchEol(before, after) {
 }
 
 export async function applyPlan({ root, inRoot, rel, resolveSheet, pageUrl, changes }) {
-  if (!Array.isArray(changes)) throw new H.EditError('Invalid change list: not allowed in an design-inside change.', 400);
+  if (!Array.isArray(changes)) throw new H.EditError('Invalid change list: not allowed in a design-inside change.', 400);
   changes.forEach(validateChange);
   const files = new Map();
   const get = (abs) => { if (!files.has(abs)) files.set(abs, fs.readFileSync(abs, 'utf8')); return files.get(abs); };
@@ -136,6 +142,29 @@ export async function applyPlan({ root, inRoot, rel, resolveSheet, pageUrl, chan
           if (!ch.optional) throw e;
           results.push({ label, warning: `Add the ${ch.family} font to your page's <head> yourself (no HTML file found).` });
         }
+        break;
+      }
+      case 'img-src':
+      case 'bg-image': {
+        // Imported image: checked byte by byte, saved under a server-chosen name in an
+        // images/ folder next to the page, then referenced from the element.
+        const abs = htmlFile(ch.loc);
+        const img = checkImage(ch.data);
+        const name = assetName(ch.name, img.buf, img.ext);
+        const dir = path.posix.dirname(String(ch.loc.file).replace(/\\/g, '/'));
+        const assetAbs = inRoot(`${dir === '.' ? '' : `${dir}/`}images/${name}`);
+        if (!assetAbs) throw new H.EditError('Can\'t save the image inside this project.', 400);
+        if (!fs.existsSync(assetAbs)) put(assetAbs, img.buf); // same content = same name: nothing to write
+        const url = `images/${name}`;
+        if (ch.kind === 'img-src') {
+          if (H.getAttribute(get(abs), { ...ch.loc, name: 'srcset' })) throw new H.EditError('This image has a srcset (several sizes), so replacing it is a job for your AI agent.');
+          put(abs, H.setAttribute(get(abs), { ...ch.loc, name: 'src', value: url }));
+        } else {
+          let src = H.setInlineStyle(get(abs), { ...ch.loc, prop: 'background-image', value: `url("${url}")` });
+          src = H.setInlineStyle(src, { ...ch.loc, prop: 'background-size', value: 'cover' });
+          put(abs, H.setInlineStyle(src, { ...ch.loc, prop: 'background-position', value: 'center' }));
+        }
+        results.push({ label, file: rel(abs), asset: rel(assetAbs), size: `${img.w}×${img.h}` });
         break;
       }
       case 'move': {

@@ -21,7 +21,7 @@ People generate sites with AI and then dislike one small thing (a color, a size,
 - The server serves or proxies the page and injects `/__em/overlay.js`. Each source element gets `data-em="<file>#<element-path>"`, where the path is the element's index chain in the source parse tree. Text, attribute and style edits don't change paths.
 - In proxy mode, HTML is tagged only if the dev server serves the file verbatim. Otherwise the page is "framework" mode, and edits fall back to unique-string search.
 - `/__em/apply` takes a batch of changes, computes all new file contents in memory, refuses if any target file is dirty in git, writes, then commits only those files.
-- Change kinds: `text`, `text-search`, `inline`, `class`, `class-search`, `css-rule`, `css-new-rule`, `css-var`, `font-link` (optional), `move`.
+- Change kinds: `text`, `text-search`, `inline`, `class`, `class-search`, `css-rule`, `css-new-rule`, `css-var`, `font-link` (optional), `move`, `img-src` and `bg-image` (an imported image: checked by `src/image.js`, saved under a server-chosen name in `images/` next to the page).
 - After a save the page reloads, so what you see is what's in the file. The selection and scroll position are restored from sessionStorage.
 - Per-directory `fs.watch` sends SSE so the page reloads when an AI agent edits files. The editor's own writes are suppressed for 1.5 s.
 - Ask AI appends to `.design-inside/requests.md` (git-excluded). The file starts with instructions, so any AI coding agent can apply it (Claude Code: `/design-inside:apply`), one commit per request (`design-inside (ai): …`).

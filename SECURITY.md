@@ -5,9 +5,10 @@ design-inside is a local development tool. It is designed to be used only by the
 - it listens on `127.0.0.1` and refuses requests whose `Host` isn't localhost (DNS rebinding);
 - it refuses writes from other websites (checked through `Origin`, `Sec-Fetch-Site` and JSON-only requests);
 - `--proxy` only wraps a dev server on the same computer;
-- it never serves or writes dotfiles (`.env`, …), `.git` or `node_modules`, and it validates every edited value.
+- it never serves or writes dotfiles (`.env`, …), `.git` or `node_modules`, and it validates every edited value;
+- imported images must be real PNG, JPEG, WebP, GIF or AVIF files (checked by content), at most 5 MB and 8000×8000 pixels, with no code hidden inside. SVG is refused, and the server chooses every file name.
 
-These rules are covered by `test/security.test.js`.
+These rules are covered by `test/security.test.js` and `test/image.test.js`.
 
 ## Reporting a vulnerability
 

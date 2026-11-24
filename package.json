@@ -1,6 +1,6 @@
 {
   "name": "design-inside",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Click any element on your localhost site, change it visually, and design-inside writes the change into your real source files and commits it.",
   "keywords": [
     "visual-editor",

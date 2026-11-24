@@ -15498,6 +15498,83 @@ async function filesIn(root3, sha) {
 // src/apply.js
 import fs from "node:fs";
 import path from "node:path";
+
+// src/image.js
+import crypto from "node:crypto";
+var MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+var MAX_IMAGE_SIDE = 8e3;
+function sniff(buf) {
+  const at = (i, ...bytes) => bytes.every((b, k) => buf[i + k] === b);
+  const ascii = (i, s) => buf.toString("latin1", i, i + s.length) === s;
+  if (buf.length >= 8 && at(0, 137, 80, 78, 71, 13, 10, 26, 10)) return { ext: "png", mime: "image/png" };
+  if (buf.length >= 3 && at(0, 255, 216, 255)) return { ext: "jpg", mime: "image/jpeg" };
+  if (buf.length >= 6 && (ascii(0, "GIF87a") || ascii(0, "GIF89a"))) return { ext: "gif", mime: "image/gif" };
+  if (buf.length >= 12 && ascii(0, "RIFF") && ascii(8, "WEBP")) return { ext: "webp", mime: "image/webp" };
+  if (buf.length >= 12 && ascii(4, "ftyp") && /^avi[fs]$/.test(buf.toString("latin1", 8, 12))) return { ext: "avif", mime: "image/avif" };
+  return null;
+}
+function dimensions(buf, ext) {
+  try {
+    if (ext === "png") return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+    if (ext === "gif") return { w: buf.readUInt16LE(6), h: buf.readUInt16LE(8) };
+    if (ext === "jpg") {
+      for (let i = 2; i + 9 < buf.length; ) {
+        if (buf[i] !== 255) {
+          i++;
+          continue;
+        }
+        const m = buf[i + 1];
+        if (m === 216 || m === 1 || m >= 208 && m <= 215) {
+          i += 2;
+          continue;
+        }
+        const len = buf.readUInt16BE(i + 2);
+        if (m >= 192 && m <= 207 && m !== 196 && m !== 200 && m !== 204) return { w: buf.readUInt16BE(i + 7), h: buf.readUInt16BE(i + 5) };
+        i += 2 + len;
+      }
+      return null;
+    }
+    if (ext === "webp") {
+      const chunk = buf.toString("latin1", 12, 16);
+      if (chunk === "VP8X") return { w: 1 + buf.readUIntLE(24, 3), h: 1 + buf.readUIntLE(27, 3) };
+      if (chunk === "VP8L") {
+        const b = buf.readUInt32LE(21);
+        return { w: (b & 16383) + 1, h: (b >> 14 & 16383) + 1 };
+      }
+      if (chunk === "VP8 ") return { w: buf.readUInt16LE(26) & 16383, h: buf.readUInt16LE(28) & 16383 };
+      return null;
+    }
+    if (ext === "avif") {
+      const i = buf.indexOf("ispe", 0, "latin1");
+      return i > 0 ? { w: buf.readUInt32BE(i + 8), h: buf.readUInt32BE(i + 12) } : null;
+    }
+  } catch {
+  }
+  return null;
+}
+var HIDDEN_CODE = /<\s*(script|svg|html|iframe|object|embed)\b|<\?php|javascript:/i;
+function checkImage(base64) {
+  if (typeof base64 !== "string" || !base64) throw new EditError("No image was sent.", 400);
+  if (base64.length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4 + 4) throw new EditError("This image is larger than 5 MB. Choose a smaller one or crop it more.", 413);
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) throw new EditError("The image data is damaged.", 400);
+  const buf = Buffer.from(base64, "base64");
+  if (buf.length === 0) throw new EditError("The image is empty.", 400);
+  if (buf.length > MAX_IMAGE_BYTES) throw new EditError("This image is larger than 5 MB. Choose a smaller one or crop it more.", 413);
+  const type = sniff(buf);
+  if (!type) throw new EditError("This file is not a PNG, JPEG, WebP, GIF or AVIF image, so it was refused. (SVG files are refused because they can contain code.)", 415);
+  if (HIDDEN_CODE.test(buf.toString("latin1"))) throw new EditError("This image contains hidden code or markup, so it was refused.", 415);
+  const dim = dimensions(buf, type.ext);
+  if (!dim || !dim.w || !dim.h) throw new EditError("Couldn't read this image's size, so it was refused.", 415);
+  if (dim.w > MAX_IMAGE_SIDE || dim.h > MAX_IMAGE_SIDE) throw new EditError(`This image is ${dim.w}\xD7${dim.h} pixels; the limit is ${MAX_IMAGE_SIDE}\xD7${MAX_IMAGE_SIDE}.`, 413);
+  return { buf, ...type, ...dim };
+}
+function assetName(original, buf, ext) {
+  const base = String(original || "image").replace(/\.[^.]*$/, "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "image";
+  const hash = crypto.createHash("sha256").update(buf).digest("hex").slice(0, 8);
+  return `${base}-${hash}.${ext}`;
+}
+
+// src/apply.js
 var SOURCE_EXT = /* @__PURE__ */ new Set([".html", ".htm", ".jsx", ".tsx", ".js", ".ts", ".vue", ".svelte", ".astro", ".md", ".mdx", ".php", ".erb", ".hbs", ".njk", ".liquid"]);
 var SKIP_DIRS = /* @__PURE__ */ new Set(["node_modules", ".git", "dist", "build", ".next", ".nuxt", ".svelte-kit", ".output", ".vercel", "coverage", ".design-inside", ".astro", "out"]);
 var PROP = /^-{0,2}[a-zA-Z][\w-]*$/;
@@ -15505,7 +15582,7 @@ var UNSAFE_VALUE = /[;{}<>\\\r\n\0]/;
 var UNSAFE_SELECTOR = /[;{}<>\\\r\n\0]|\/\*/;
 function validateChange(ch) {
   const bad = (what) => {
-    throw new EditError(`Invalid ${what}: not allowed in an design-inside change.`, 400);
+    throw new EditError(`Invalid ${what}: not allowed in a design-inside change.`, 400);
   };
   if (!ch || typeof ch !== "object" || typeof ch.kind !== "string") bad("change");
   if ("prop" in ch && ch.prop != null && !(typeof ch.prop === "string" && PROP.test(ch.prop))) bad("property name");
@@ -15515,13 +15592,17 @@ function validateChange(ch) {
   if (ch.kind === "css-new-rule" && (typeof ch.selector !== "string" || UNSAFE_SELECTOR.test(ch.selector))) bad("selector");
   if (ch.kind === "css-var" && !(typeof ch.name === "string" && /^--[\w-]+$/.test(ch.name))) bad("variable name");
   if (ch.kind === "font-link" && !(typeof ch.family === "string" && /^[A-Za-z0-9 ]{1,60}$/.test(ch.family))) bad("font name");
+  if (["img-src", "bg-image"].includes(ch.kind)) {
+    if (!ch.loc || typeof ch.loc.file !== "string" || typeof ch.loc.path !== "string") bad("image target");
+    if (ch.name != null && (typeof ch.name !== "string" || ch.name.length > 200)) bad("image name");
+  }
 }
 function matchEol(before, after) {
   if (!before || !before.includes("\r\n") || /(^|[^\r])\n/.test(before)) return after;
   return after.replace(/\r?\n/g, "\r\n");
 }
 async function applyPlan({ root: root3, inRoot, rel, resolveSheet, pageUrl, changes }) {
-  if (!Array.isArray(changes)) throw new EditError("Invalid change list: not allowed in an design-inside change.", 400);
+  if (!Array.isArray(changes)) throw new EditError("Invalid change list: not allowed in a design-inside change.", 400);
   changes.forEach(validateChange);
   const files = /* @__PURE__ */ new Map();
   const get = (abs) => {
@@ -15631,6 +15712,27 @@ async function applyPlan({ root: root3, inRoot, rel, resolveSheet, pageUrl, chan
           if (!ch.optional) throw e;
           results.push({ label, warning: `Add the ${ch.family} font to your page's <head> yourself (no HTML file found).` });
         }
+        break;
+      }
+      case "img-src":
+      case "bg-image": {
+        const abs = htmlFile(ch.loc);
+        const img = checkImage(ch.data);
+        const name = assetName(ch.name, img.buf, img.ext);
+        const dir = path.posix.dirname(String(ch.loc.file).replace(/\\/g, "/"));
+        const assetAbs = inRoot(`${dir === "." ? "" : `${dir}/`}images/${name}`);
+        if (!assetAbs) throw new EditError("Can't save the image inside this project.", 400);
+        if (!fs.existsSync(assetAbs)) put(assetAbs, img.buf);
+        const url = `images/${name}`;
+        if (ch.kind === "img-src") {
+          if (getAttribute(get(abs), { ...ch.loc, name: "srcset" })) throw new EditError("This image has a srcset (several sizes), so replacing it is a job for your AI agent.");
+          put(abs, setAttribute(get(abs), { ...ch.loc, name: "src", value: url }));
+        } else {
+          let src = setInlineStyle(get(abs), { ...ch.loc, prop: "background-image", value: `url("${url}")` });
+          src = setInlineStyle(src, { ...ch.loc, prop: "background-size", value: "cover" });
+          put(abs, setInlineStyle(src, { ...ch.loc, prop: "background-position", value: "center" }));
+        }
+        results.push({ label, file: rel(abs), asset: rel(assetAbs), size: `${img.w}\xD7${img.h}` });
         break;
       }
       case "move": {
@@ -15777,10 +15879,23 @@ function createServer({ root: root3, proxy = null, log = console.log }) {
     const tag = `<script src="/__em/overlay.js" data-em-mode="${proxy ? "proxy" : "static"}" defer></script>`;
     return /<\/body>/i.test(html) ? html.replace(/<\/body>(?![\s\S]*<\/body>)/i, `${tag}</body>`) : html + tag;
   };
-  async function readJson(req) {
+  const MB = 1024 * 1024;
+  async function readJson(req, limit = 1 * MB) {
     const chunks = [];
-    for await (const c of req) chunks.push(c);
-    return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+    let size = 0;
+    for await (const c of req) {
+      size += c.length;
+      if (size > limit) {
+        req.destroy();
+        throw new EditError(`Request is larger than ${Math.round(limit / MB)} MB.`, 413);
+      }
+      chunks.push(c);
+    }
+    try {
+      return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+    } catch {
+      throw new EditError("Request is not valid JSON.", 400);
+    }
   }
   const send = (res, code, body, type = "application/json") => {
     res.writeHead(code, { "content-type": type, "cache-control": "no-store" });
@@ -15830,7 +15945,7 @@ function createServer({ root: root3, proxy = null, log = console.log }) {
         return send(res, 200, { ok: true });
       }
       if (route === "apply" && req.method === "POST") {
-        const body = await readJson(req);
+        const body = await readJson(req, 8 * MB);
         if (!await isRepo(root3)) return send(res, 412, { error: 'This folder is not a git repository yet. Click "Turn on undo (git init)" first.' });
         const result = await applyPlan({ root: root3, inRoot, rel, resolveSheet, pageUrl: body.pageUrl, changes: body.changes });
         const files = Object.keys(result.writes);
@@ -15841,6 +15956,7 @@ function createServer({ root: root3, proxy = null, log = console.log }) {
         }
         for (const [abs, content] of Object.entries(result.writes)) {
           recentWrites.set(abs, Date.now());
+          await fsp.mkdir(path2.dirname(abs), { recursive: true });
           await fsp.writeFile(abs, content);
         }
         const labels = [...new Set(result.results.map((r) => r.label).filter(Boolean))];
