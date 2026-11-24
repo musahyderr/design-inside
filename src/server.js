@@ -29,6 +29,7 @@ export function createServer({ root, proxy = null, log = console.log }) {
     if (abs !== root && !abs.startsWith(root + path.sep)) return null;
     const parts = path.relative(root, abs).split(path.sep);
     if (parts.includes('.git') || parts.includes('node_modules')) return null;
+    if (parts.some((p) => p.startsWith('.') && p !== '.' && p !== '..')) return null; // .env, .ssh, .editor-mode…
     return abs;
   };
   const rel = (abs) => path.relative(root, abs).split(path.sep).join('/');
@@ -258,8 +259,27 @@ export function createServer({ root, proxy = null, log = console.log }) {
     req.pipe(up);
   }
 
+  // Only this machine's browser, on this server's own address, may use it.
+  // - Host must be localhost: blocks DNS-rebinding pages (evil.example → 127.0.0.1).
+  // - Writes must come from our own origin and be JSON: a cross-site page can only
+  //   send "simple" requests (text/plain, no preflight), and its Origin differs.
+  const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i;
+  const localOrigin = (o) => { try { const u = new URL(o); return /^https?:$/.test(u.protocol) && LOCAL.test(u.host); } catch { return false; } };
+  function refused(req, url) {
+    if (!LOCAL.test(req.headers.host || '')) return [403, 'editor-mode only answers on localhost.'];
+    if (url.pathname.startsWith('/__em/') && req.method !== 'GET' && req.method !== 'HEAD') {
+      const origin = req.headers.origin;
+      if (origin && (!localOrigin(origin) || new URL(origin).host.toLowerCase() !== req.headers.host.toLowerCase())) return [403, 'Requests from other websites are refused.'];
+      if (req.headers['sec-fetch-site'] && !['same-origin', 'none'].includes(req.headers['sec-fetch-site'])) return [403, 'Requests from other websites are refused.'];
+      if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return [415, 'editor-mode expects JSON.'];
+    }
+    return null;
+  }
+
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://x');
+    const no = refused(req, url);
+    if (no) return send(res, no[0], { error: no[1] });
     if (url.pathname.startsWith('/__em/')) return api(req, res, url.pathname.slice(6));
     if (proxy) return serveProxy(req, res, url);
     return serveStatic(req, res, url).catch((e) => send(res, 500, e.message, 'text/plain'));
@@ -267,7 +287,7 @@ export function createServer({ root, proxy = null, log = console.log }) {
 
   // Websocket passthrough so the dev server's hot reload keeps working.
   server.on('upgrade', (req, socket, head) => {
-    if (!proxy) return socket.destroy();
+    if (!proxy || !LOCAL.test(req.headers.host || '')) return socket.destroy();
     const t = new URL(proxy);
     const up = http.request({ host: t.hostname, port: t.port, path: req.url, method: req.method, headers: { ...req.headers, host: t.host } });
     up.on('upgrade', (ures, usock, uhead) => {
@@ -280,7 +300,15 @@ export function createServer({ root, proxy = null, log = console.log }) {
     up.end();
   });
 
-  return { server, root, searchReplace };
+  // Stop watching files and close the server (tests, embedding).
+  const close = () => new Promise((r) => {
+    for (const w of watchers.values()) w.close();
+    watchers.clear();
+    for (const c of clients) c.end();
+    server.close(() => r());
+  });
+
+  return { server, root, searchReplace, close };
 }
 
 export { H, C };

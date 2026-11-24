@@ -27,7 +27,8 @@ Every save is **one git commit** that touches only the files it changed. **Undo*
 - **It refuses rather than guesses.** If the text or class list in the file no longer matches the page, or a search finds the text in two places, it stops and offers to hand the change to Claude.
 - **It never commits over your work.** If a file it needs has uncommitted changes, it won't touch that file.
 - **Minimal diffs.** HTML edits are byte-range splices at parser source offsets, and CSS goes through postcss, so formatting outside the changed value is preserved. Changing one color is a one-line diff.
-- **Only inside the project folder**, never `.git` or `node_modules`.
+- **Only inside the project folder**, never `.git`, `node_modules` or dotfiles like `.env` (which are also never served).
+- **Only your browser, only on localhost.** The server listens on 127.0.0.1, refuses any other `Host` (DNS rebinding), and refuses writes that come from another website or aren't JSON, so a page you visit can't edit your files or queue instructions for Claude. Edited values are checked so they can't break out of the CSS declaration or HTML attribute they go into.
 
 ## Install (Claude Code plugin)
 

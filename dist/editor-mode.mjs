@@ -15500,7 +15500,25 @@ import fs from "node:fs";
 import path from "node:path";
 var SOURCE_EXT = /* @__PURE__ */ new Set([".html", ".htm", ".jsx", ".tsx", ".js", ".ts", ".vue", ".svelte", ".astro", ".md", ".mdx", ".php", ".erb", ".hbs", ".njk", ".liquid"]);
 var SKIP_DIRS = /* @__PURE__ */ new Set(["node_modules", ".git", "dist", "build", ".next", ".nuxt", ".svelte-kit", ".output", ".vercel", "coverage", ".editor-mode", ".astro", "out"]);
+var PROP = /^-{0,2}[a-zA-Z][\w-]*$/;
+var UNSAFE_VALUE = /[;{}<>\\\r\n\0]/;
+var UNSAFE_SELECTOR = /[;{}<>\\\r\n\0]|\/\*/;
+function validateChange(ch) {
+  const bad = (what) => {
+    throw new EditError(`Invalid ${what}: not allowed in an editor-mode change.`, 400);
+  };
+  if (!ch || typeof ch !== "object" || typeof ch.kind !== "string") bad("change");
+  if ("prop" in ch && ch.prop != null && !(typeof ch.prop === "string" && PROP.test(ch.prop))) bad("property name");
+  if (["inline", "css-rule", "css-new-rule", "css-var"].includes(ch.kind)) {
+    if (typeof ch.value !== "string" || UNSAFE_VALUE.test(ch.value) || /\/\*/.test(ch.value)) bad("value");
+  }
+  if (ch.kind === "css-new-rule" && (typeof ch.selector !== "string" || UNSAFE_SELECTOR.test(ch.selector))) bad("selector");
+  if (ch.kind === "css-var" && !(typeof ch.name === "string" && /^--[\w-]+$/.test(ch.name))) bad("variable name");
+  if (ch.kind === "font-link" && !(typeof ch.family === "string" && /^[A-Za-z0-9 ]{1,60}$/.test(ch.family))) bad("font name");
+}
 async function applyPlan({ root: root3, inRoot, rel, resolveSheet, pageUrl, changes }) {
+  if (!Array.isArray(changes)) throw new EditError("Invalid change list: not allowed in an editor-mode change.", 400);
+  changes.forEach(validateChange);
   const files = /* @__PURE__ */ new Map();
   const get = (abs) => {
     if (!files.has(abs)) files.set(abs, fs.readFileSync(abs, "utf8"));
@@ -15703,6 +15721,7 @@ function createServer({ root: root3, proxy = null, log = console.log }) {
     if (abs !== root3 && !abs.startsWith(root3 + path2.sep)) return null;
     const parts = path2.relative(root3, abs).split(path2.sep);
     if (parts.includes(".git") || parts.includes("node_modules")) return null;
+    if (parts.some((p) => p.startsWith(".") && p !== "." && p !== "..")) return null;
     return abs;
   };
   const rel = (abs) => path2.relative(root3, abs).split(path2.sep).join("/");
@@ -15954,14 +15973,35 @@ data: ${JSON.stringify({ file: n })}
 Is your dev server running?`, "text/plain"));
     req.pipe(up);
   }
+  const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i;
+  const localOrigin = (o) => {
+    try {
+      const u = new URL(o);
+      return /^https?:$/.test(u.protocol) && LOCAL.test(u.host);
+    } catch {
+      return false;
+    }
+  };
+  function refused(req, url) {
+    if (!LOCAL.test(req.headers.host || "")) return [403, "editor-mode only answers on localhost."];
+    if (url.pathname.startsWith("/__em/") && req.method !== "GET" && req.method !== "HEAD") {
+      const origin = req.headers.origin;
+      if (origin && (!localOrigin(origin) || new URL(origin).host.toLowerCase() !== req.headers.host.toLowerCase())) return [403, "Requests from other websites are refused."];
+      if (req.headers["sec-fetch-site"] && !["same-origin", "none"].includes(req.headers["sec-fetch-site"])) return [403, "Requests from other websites are refused."];
+      if (!/^application\/json\b/i.test(req.headers["content-type"] || "")) return [415, "editor-mode expects JSON."];
+    }
+    return null;
+  }
   const server2 = http.createServer((req, res) => {
     const url = new URL(req.url, "http://x");
+    const no = refused(req, url);
+    if (no) return send(res, no[0], { error: no[1] });
     if (url.pathname.startsWith("/__em/")) return api(req, res, url.pathname.slice(6));
     if (proxy) return serveProxy(req, res, url);
     return serveStatic(req, res, url).catch((e) => send(res, 500, e.message, "text/plain"));
   });
   server2.on("upgrade", (req, socket, head) => {
-    if (!proxy) return socket.destroy();
+    if (!proxy || !LOCAL.test(req.headers.host || "")) return socket.destroy();
     const t = new URL(proxy);
     const up = http.request({ host: t.hostname, port: t.port, path: req.url, method: req.method, headers: { ...req.headers, host: t.host } });
     up.on("upgrade", (ures, usock, uhead) => {
@@ -15976,7 +16016,13 @@ ${Object.entries(ures.headers).map(([k, v]) => `${k}: ${v}`).join("\r\n")}\r
     up.on("error", () => socket.destroy());
     up.end();
   });
-  return { server: server2, root: root3, searchReplace };
+  const close = () => new Promise((r) => {
+    for (const w of watchers.values()) w.close();
+    watchers.clear();
+    for (const c of clients) c.end();
+    server2.close(() => r());
+  });
+  return { server: server2, root: root3, searchReplace, close };
 }
 
 // bin/cli.js

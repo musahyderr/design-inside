@@ -10,7 +10,27 @@ import * as C from './css.js';
 const SOURCE_EXT = new Set(['.html', '.htm', '.jsx', '.tsx', '.js', '.ts', '.vue', '.svelte', '.astro', '.md', '.mdx', '.php', '.erb', '.hbs', '.njk', '.liquid']);
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.nuxt', '.svelte-kit', '.output', '.vercel', 'coverage', '.editor-mode', '.astro', 'out']);
 
+// Every value that ends up in a CSS declaration, a style="" attribute or a
+// <link> must be one plain value: no ; { } < > or line breaks that could end
+// the declaration, the rule, the attribute or the <style> block.
+const PROP = /^-{0,2}[a-zA-Z][\w-]*$/;
+const UNSAFE_VALUE = /[;{}<>\\\r\n\0]/;
+const UNSAFE_SELECTOR = /[;{}<>\\\r\n\0]|\/\*/;
+export function validateChange(ch) {
+  const bad = (what) => { throw new H.EditError(`Invalid ${what}: not allowed in an editor-mode change.`, 400); };
+  if (!ch || typeof ch !== 'object' || typeof ch.kind !== 'string') bad('change');
+  if ('prop' in ch && ch.prop != null && !(typeof ch.prop === 'string' && PROP.test(ch.prop))) bad('property name');
+  if (['inline', 'css-rule', 'css-new-rule', 'css-var'].includes(ch.kind)) {
+    if (typeof ch.value !== 'string' || UNSAFE_VALUE.test(ch.value) || /\/\*/.test(ch.value)) bad('value');
+  }
+  if (ch.kind === 'css-new-rule' && (typeof ch.selector !== 'string' || UNSAFE_SELECTOR.test(ch.selector))) bad('selector');
+  if (ch.kind === 'css-var' && !(typeof ch.name === 'string' && /^--[\w-]+$/.test(ch.name))) bad('variable name');
+  if (ch.kind === 'font-link' && !(typeof ch.family === 'string' && /^[A-Za-z0-9 ]{1,60}$/.test(ch.family))) bad('font name');
+}
+
 export async function applyPlan({ root, inRoot, rel, resolveSheet, pageUrl, changes }) {
+  if (!Array.isArray(changes)) throw new H.EditError('Invalid change list: not allowed in an editor-mode change.', 400);
+  changes.forEach(validateChange);
   const files = new Map();
   const get = (abs) => { if (!files.has(abs)) files.set(abs, fs.readFileSync(abs, 'utf8')); return files.get(abs); };
   const put = (abs, s) => files.set(abs, s);
