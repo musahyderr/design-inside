@@ -457,35 +457,51 @@ import { STYLES } from './styles.js';
     }
     applyLayout();
   }
+  // double-click the top bar: unstick the panel (back to the default place and size)
+  panel.addEventListener('dblclick', (e) => {
+    if (!e.target.closest('header') || e.target.closest('button, input, select, textarea')) return;
+    st.layout = { ...LAYOUT_DEFAULT }; saveLayout(); renderPanel(); applyLayout();
+  });
   // drag the top bar to move, drag the corner to resize
   panel.addEventListener('pointerdown', (e) => {
     const edge = e.target.closest('.edge');
-    const grip = e.target.closest('.grip') || edge;
+    const edgeB = e.target.closest('.edge-b');
+    const grip = e.target.closest('.grip') || edge || edgeB;
     const bar = !grip && e.target.closest('header') && !e.target.closest('button, input, select, textarea');
     if (!grip && !bar) return;
     e.preventDefault();
     const r = panel.getBoundingClientRect();
     const start = { x: e.clientX, y: e.clientY, left: r.left, top: r.top, w: r.width, h: r.height };
     const anchorRight = panel.classList.contains('anchor-right');
-    if (bar) Object.assign(st.layout, { dock: 'free', x: r.left, y: r.top, w: r.width, h: st.layout.min ? st.layout.h : r.height });
-    panel.setPointerCapture(e.pointerId);
-    panel.classList.add(bar ? 'dragging' : 'resizing');
+    // A click (or double-click) on the top bar must not detach the panel:
+    // the drag only starts once the pointer has moved a few pixels.
+    let started = false;
+    const begin = () => {
+      started = true;
+      if (bar) Object.assign(st.layout, { dock: 'free', x: r.left, y: r.top, w: r.width, h: st.layout.min ? st.layout.h : r.height });
+      panel.classList.add(bar ? 'dragging' : edgeB ? 'resizing-b' : 'resizing');
+    };
+    if (!bar) begin();
     const move = (ev) => {
       const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
+      if (!started) { if (Math.hypot(dx, dy) < 4) return; begin(); }
       if (bar) { st.layout.x = start.left + dx; st.layout.y = start.top + dy; } else {
-        st.layout.w = clamp(start.w + (anchorRight ? -dx : dx), MIN_W, innerWidth - 24);
+        if (!edgeB) st.layout.w = clamp(start.w + (anchorRight ? -dx : dx), MIN_W, innerWidth - 24);
         if (!edge && !['auto', 'left', 'right'].includes(st.layout.dock)) st.layout.h = clamp(start.h + dy, 200, innerHeight - 24);
       }
       applyLayout();
     };
+    // listen on window (not pointer capture), so clicks and double-clicks reach their targets
     const up = () => {
-      panel.removeEventListener('pointermove', move);
-      panel.classList.remove('dragging', 'resizing');
-      saveLayout();
+      removeEventListener('pointermove', move, true);
+      removeEventListener('pointerup', up, true);
+      removeEventListener('pointercancel', up, true);
+      panel.classList.remove('dragging', 'resizing', 'resizing-b');
+      if (started) saveLayout();
     };
-    panel.addEventListener('pointermove', move);
-    panel.addEventListener('pointerup', up, { once: true });
-    panel.addEventListener('pointercancel', up, { once: true });
+    addEventListener('pointermove', move, true);
+    addEventListener('pointerup', up, true);
+    addEventListener('pointercancel', up, true);
   });
   function positionBoxes() {
     dockPanel();
@@ -654,7 +670,7 @@ import { STYLES } from './styles.js';
     const k = kindOf(el, cs);
 
     panel.innerHTML = `
-      <header>
+      <header title="Drag to move · double-click to put the panel back">
         <div class="crumb">
           ${el.parentElement && el.parentElement !== document.body ? `<button class="ghost up" title="Select parent">↖</button>` : ''}
           <div>
@@ -671,7 +687,7 @@ import { STYLES } from './styles.js';
       ${st.layoutOpen ? `<div class="layout-row">
         <div class="seg">${[['left', '◧ Left'], ['top', '⬒ Top'], ['center', '▣ Center'], ['right', '◨ Right']].map(([d, t]) => `<button data-dock="${d}" class="${st.layout.dock === d ? 'on' : ''}">${t}</button>`).join('')}</div>
         <button class="mini reset-layout" title="Back to the default position and size">Reset</button>
-        <p class="hint">Or drag this top bar to put the panel anywhere. Drag its side edge (it turns blue) to make it narrower or wider, or its corner to resize it.</p>
+        <p class="hint">Or drag this top bar to put the panel anywhere, and double-click it to put the panel back. Drag a blue edge or the corner to resize it.</p>
       </div>` : ''}
       <nav class="tabs">
         <button data-tab="style" class="${st.tab === 'style' ? 'on' : ''}">Design</button>
@@ -742,6 +758,7 @@ import { STYLES } from './styles.js';
       </div>
       <footer class="pending"></footer>
       <div class="edge" title="Drag to make the panel wider or narrower"></div>
+      <div class="edge-b" title="Drag to make the panel taller or shorter"></div>
       <div class="grip" title="Drag to resize"></div>`;
 
     if (st.tab === 'history') loadHistory();

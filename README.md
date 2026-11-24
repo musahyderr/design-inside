@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/musahyderr/design-inside/actions/workflows/check.yml"><img alt="check" src="https://github.com/musahyderr/design-inside/actions/workflows/check.yml/badge.svg"></a>
   <a href="#verification"><img alt="tested on Linux, macOS and Windows" src="https://img.shields.io/badge/tested%20on-Linux%20%7C%20macOS%20%7C%20Windows-informational"></a>
-  <a href="#verification"><img alt="103 checks" src="https://img.shields.io/badge/checks-35%20unit%20%2B%2068%20browser-success"></a>
+  <a href="#verification"><img alt="105 checks" src="https://img.shields.io/badge/checks-35%20unit%20%2B%2070%20browser-success"></a>
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%3E%3D22-339933">
   <img alt="works with any AI agent" src="https://img.shields.io/badge/AI%20agent-any%20(or%20none)-8b5cf6">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
@@ -42,7 +42,7 @@ The tool is a single bundled file, so there's nothing to `npm install`. Using Cl
 
 The panel shows only the controls that fit what you clicked. A heading gets text and font controls, an image gets size with *Keep proportions*, and a card gets background, spacing and "Text inside".
 
-Put the panel wherever it suits you. Use **⇱** to dock it **left, top, center or right**, drag its top bar to place it anywhere, drag its side edge (it turns blue) to make it narrower or wider, drag its corner to resize it, or use **–** to collapse it to its title bar. The layout is remembered for each site, and **Reset** restores the default.
+Put the panel wherever it suits you. Use **⇱** to dock it **left, top, center or right**, drag its top bar to place it anywhere, drag a side or bottom edge (it turns blue) or the corner to resize it, or use **–** to collapse it to its title bar. Stuck somewhere awkward? Double-click the top bar to put it back. The layout is remembered for each site, and **Reset** restores the default.
 
 | | |
 |---|---|
@@ -121,7 +121,7 @@ Every pull request and every change to `main` runs the full test suite in CI. A 
 | Suite | Checks | What it proves |
 |---|---|---|
 | Unit tests | 35 | Source editing (HTML, CSS, `<style>` blocks, Tailwind), Windows line endings are kept, framework text search, git history and undo, and the security rules |
-| Browser: static site | 54 | The real panel in Chromium: moving, docking, resizing and collapsing the panel (and saving while it is moved), live preview, cascade-aware rule edits, inline edits, theme variables, fonts, Text box, reordering, undo, Ask AI queue, live reload, refusing to commit over your work, element-aware controls, outline position while scrolling |
+| Browser: static site | 56 | The real panel in Chromium: moving, docking, resizing and collapsing the panel (and saving while it is moved), live preview, cascade-aware rule edits, inline edits, theme variables, fonts, Text box, reordering, undo, Ask AI queue, live reload, refusing to commit over your work, element-aware controls, outline position while scrolling |
 | Browser: proxy mode | 9 | Wrapping a dev server: source-mapped HTML, JavaScript-rendered text, CSS rules, and hot-reload WebSocket passthrough |
 | Browser: Tailwind | 5 | Panel changes become utility-class swaps, and unrelated classes are kept |
 | Dependency audit | `npm audit` | No known vulnerabilities in runtime dependencies |

@@ -208,6 +208,14 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await page.mouse.up();
   check(Math.round((await box()).w) === 236, `the panel stops at its minimum width (${Math.round((await box()).w)}px)`);
   check((await ui('.body').evaluate((b) => getComputedStyle(b).scrollbarColor)).includes('rgb(46, 46, 54)'), 'the panel uses a dark scrollbar');
+  const tall = await box();
+  const eb = await ui('.edge-b').boundingBox();
+  await page.mouse.move(eb.x + eb.width / 2, eb.y + 4);
+  await page.mouse.down();
+  await page.mouse.move(eb.x + eb.width / 2, eb.y - 76, { steps: 6 });
+  await page.mouse.up();
+  const shorter = await box();
+  check(Math.abs(shorter.h - (tall.h - 80)) < 3 && Math.abs(shorter.w - tall.w) < 2, `the bottom edge makes the panel shorter (${Math.round(tall.h)} → ${Math.round(shorter.h)}px)`);
   await ui('.min-btn').click();
   check(!(await ui('.body').isVisible()) && (await box()).h < 120, 'panel collapses to its top bar');
   await ui('.min-btn').click();
@@ -225,6 +233,9 @@ const check = (cond, msg) => { if (!cond) { console.error('✗', msg); process.e
   await ui('.layout-btn').click();
   await ui('.reset-layout').click();
   check((await box()).l > 1000, 'Reset puts the panel back on the right');
+  await ui('[data-dock="left"]').click();
+  await ui('.panel header .src').dblclick();
+  check((await box()).l > 1000 && (await ui('.panel').evaluate((p) => p.dataset.dock)) === 'auto', 'double-clicking the top bar puts the panel back');
   await page.click('.logo', { position: { x: 4, y: 4 } });
 
   // 10. ask AI for something the panel can't do

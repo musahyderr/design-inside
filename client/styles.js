@@ -38,8 +38,9 @@ header { cursor: grab; touch-action: none; }
 .layout-row .seg button { padding: 4px 8px; }
 .layout-row .hint { margin: 0; width: 100%; }
 .panel.min .tabs, .panel.min .body, .panel.min footer, .panel.min .warn, .panel.min .grip, .panel.min .layout-row { display: none; }
-.grip { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; touch-action: none;
-  background: linear-gradient(135deg, transparent 50%, var(--line) 50%, var(--line) 60%, transparent 60%, transparent 70%, var(--line) 70%, var(--line) 80%, transparent 80%); }
+.grip { position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none; z-index: 3;
+  background: linear-gradient(135deg, transparent 45%, var(--dim) 45%, var(--dim) 53%, transparent 53%, transparent 64%, var(--dim) 64%, var(--dim) 72%, transparent 72%); opacity: .7; }
+.grip:hover { opacity: 1; background-color: rgba(59,130,246,.15); border-top-left-radius: 6px; }
 .panel.anchor-right .grip { right: auto; left: 0; cursor: nesw-resize; transform: scaleX(-1); }
 /* resize edge: a thin line along the inner side that lights up blue */
 .edge { position: absolute; top: 0; bottom: 18px; right: 0; width: 8px; cursor: ew-resize; touch-action: none; z-index: 2; }
@@ -48,6 +49,11 @@ header { cursor: grab; touch-action: none; }
 .panel.anchor-right .edge { right: auto; left: 0; }
 .panel.anchor-right .edge::after { right: auto; left: 0; }
 .panel.min .edge { display: none; }
+/* bottom edge: stretch the panel taller or shorter (hidden when it already fills the height) */
+.edge-b { position: absolute; left: 22px; right: 22px; bottom: 0; height: 8px; cursor: ns-resize; touch-action: none; z-index: 2; }
+.edge-b::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 0; height: 3px; border-radius: 3px; background: transparent; transition: background .12s; }
+.edge-b:hover::after, .panel.resizing-b .edge-b::after { background: #3b82f6; }
+.panel.min .edge-b, .panel[data-dock="auto"] .edge-b, .panel[data-dock="left"] .edge-b, .panel[data-dock="right"] .edge-b { display: none; }
 /* dark scrollbars inside the panel */
 .panel, .panel * { scrollbar-width: thin; scrollbar-color: #2e2e36 #0d0d10; }
 .panel ::-webkit-scrollbar { width: 8px; height: 8px; }
