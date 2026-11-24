@@ -3,7 +3,7 @@
 <p align="center"><b>Click anything on your localhost site, change it visually, and editor-mode writes the change into your real source files and commits it to git.</b></p>
 
 <p align="center">
-  <a href="https://github.com/musahyderr/editor-mode/actions/workflows/check.yml"><img alt="check" src="https://github.com/musahyderr/editor-mode/actions/workflows/check.yml/badge.svg"></a>
+  <a href="https://github.com/musahyderr/designinside/actions/workflows/check.yml"><img alt="check" src="https://github.com/musahyderr/designinside/actions/workflows/check.yml/badge.svg"></a>
   <img alt="tested on Linux, macOS and Windows" src="https://img.shields.io/badge/tested%20on-Linux%20%7C%20macOS%20%7C%20Windows-informational">
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%3E%3D22-339933">
   <img alt="works with any AI agent" src="https://img.shields.io/badge/AI%20agent-any%20(or%20none)-8b5cf6">
@@ -22,17 +22,17 @@ Built for the moment after an AI generates your site and *one thing* is off: a c
 You need [Node.js](https://nodejs.org) 22+ and git, on Linux, macOS or Windows.
 
 ```bash
-git clone https://github.com/musahyderr/editor-mode.git
+git clone https://github.com/musahyderr/designinside.git
 ```
 
 ```bash
-node editor-mode/dist/editor-mode.mjs ./my-site
+node designinside/dist/editor-mode.mjs ./my-site
 ```
 
 Open **http://localhost:4400**, press **Alt+E** (or click **Edit page**), and click anything. Already running a dev server on, say, port 5173? Wrap it instead, and its hot reload keeps working:
 
 ```bash
-node editor-mode/dist/editor-mode.mjs --proxy 5173 ./my-site
+node designinside/dist/editor-mode.mjs --proxy 5173 ./my-site
 ```
 
 The tool is a single bundled file, so there's nothing to `npm install`. Using Claude Code? Install it as a plugin instead: see [With Claude Code](#with-claude-code).
@@ -71,7 +71,7 @@ The panel works without any AI. The **Ask AI** tab is for changes it can't make 
 ### With Claude Code
 
 ```bash
-/plugin marketplace add musahyderr/editor-mode
+/plugin marketplace add musahyderr/designinside
 ```
 
 ```bash
@@ -156,7 +156,7 @@ It runs the unit tests, rebuilds `dist/`, and then runs three browser suites, ea
 
 `dist/` is committed so the tool runs without an install, so run `npm run build` after changing `src/` or `client/`.
 
-Found a security problem? Please report it privately through [Security → Report a vulnerability](https://github.com/musahyderr/editor-mode/security/advisories/new) rather than in a public issue.
+Found a security problem? Please report it privately through [Security → Report a vulnerability](https://github.com/musahyderr/designinside/security/advisories/new) rather than in a public issue.
 
 ## License
 

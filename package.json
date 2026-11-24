@@ -13,11 +13,11 @@
     "codex",
     "localhost-only"
   ],
-  "homepage": "https://github.com/musahyderr/editor-mode#readme",
-  "bugs": "https://github.com/musahyderr/editor-mode/issues",
+  "homepage": "https://github.com/musahyderr/designinside#readme",
+  "bugs": "https://github.com/musahyderr/designinside/issues",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/musahyderr/editor-mode.git"
+    "url": "git+https://github.com/musahyderr/designinside.git"
   },
   "license": "MIT",
   "author": "editor-mode contributors",
