@@ -1,0 +1,171 @@
+// Turns a batch of changes from the overlay into new file contents.
+// Nothing is written here: the server writes all files only if every change
+// in the batch succeeded, then commits them together.
+
+import fs from 'node:fs';
+import path from 'node:path';
+import * as H from './html.js';
+import * as C from './css.js';
+
+const SOURCE_EXT = new Set(['.html', '.htm', '.jsx', '.tsx', '.js', '.ts', '.vue', '.svelte', '.astro', '.md', '.mdx', '.php', '.erb', '.hbs', '.njk', '.liquid']);
+const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.nuxt', '.svelte-kit', '.output', '.vercel', 'coverage', '.editor-mode', '.astro', 'out']);
+
+export async function applyPlan({ root, inRoot, rel, resolveSheet, pageUrl, changes }) {
+  const files = new Map();
+  const get = (abs) => { if (!files.has(abs)) files.set(abs, fs.readFileSync(abs, 'utf8')); return files.get(abs); };
+  const put = (abs, s) => files.set(abs, s);
+  const original = new Map();
+  const touch = (abs) => { if (!original.has(abs)) original.set(abs, fs.readFileSync(abs, 'utf8')); };
+  const results = [];
+  let reload = false;
+
+  const htmlFile = (loc) => {
+    const abs = inRoot(loc.file);
+    if (!abs || !fs.existsSync(abs)) throw new H.EditError(`File ${loc.file} is not in the project.`, 400);
+    touch(abs);
+    return abs;
+  };
+
+  // Edit CSS that may live in a .css file or in a <style> block of an HTML file.
+  const editCss = (sheet, fn) => {
+    const s = resolveSheet(sheet, pageUrl);
+    touch(s.abs);
+    if (s.styleBlock) {
+      const src = get(s.abs);
+      const block = H.styleBlock(src, { path: s.styleBlock });
+      put(s.abs, H.splice(src, [[block.start, block.end, fn(block.css)]]));
+    } else {
+      put(s.abs, fn(get(s.abs)));
+    }
+    return rel(s.abs);
+  };
+
+  for (const ch of changes) {
+    const label = ch.label || ch.kind;
+    switch (ch.kind) {
+      case 'text': {
+        const abs = htmlFile(ch.loc);
+        put(abs, H.editText(get(abs), { ...ch.loc, oldText: ch.oldText, newText: ch.newText }));
+        results.push({ label, file: rel(abs) });
+        break;
+      }
+      case 'text-search': {
+        const hit = searchReplace(root, ch.oldText.trim(), ch.newText.trim(), get, { mode: 'text' });
+        touch(hit.abs); put(hit.abs, hit.content);
+        results.push({ label, file: rel(hit.abs) });
+        break;
+      }
+      case 'inline': {
+        const abs = htmlFile(ch.loc);
+        put(abs, H.setInlineStyle(get(abs), { ...ch.loc, prop: ch.prop, value: ch.value }));
+        results.push({ label, file: rel(abs) });
+        break;
+      }
+      case 'class': {
+        const abs = htmlFile(ch.loc);
+        const cur = H.getAttribute(get(abs), { ...ch.loc, name: 'class' }) || '';
+        if (ch.oldClass != null && cur.trim().replace(/\s+/g, ' ') !== ch.oldClass.trim().replace(/\s+/g, ' ')) {
+          throw new H.EditError('The class list in the file no longer matches the page. Reload and try again.');
+        }
+        put(abs, H.setAttribute(get(abs), { ...ch.loc, name: 'class', value: ch.newClass }));
+        results.push({ label, file: rel(abs) });
+        break;
+      }
+      case 'class-search': {
+        const hit = searchReplace(root, ch.oldClass.trim(), ch.newClass.trim(), get, { mode: 'class' });
+        touch(hit.abs); put(hit.abs, hit.content);
+        results.push({ label, file: rel(hit.abs) });
+        break;
+      }
+      case 'css-rule': {
+        const f = editCss(ch.sheet, (css) => C.setDeclaration(css, { selector: ch.selector, conditions: ch.conditions, occurrence: ch.occurrence }, ch.prop, ch.value));
+        results.push({ label, file: f });
+        break;
+      }
+      case 'css-new-rule': {
+        const f = editCss(ch.sheet, (css) => C.upsertRule(css, ch.selector, ch.prop, ch.value));
+        results.push({ label, file: f });
+        break;
+      }
+      case 'css-var': {
+        let done = null;
+        for (const sheet of ch.sheets) {
+          let s;
+          try { s = resolveSheet(sheet, pageUrl); } catch { continue; }
+          const src = get(s.abs);
+          const css = s.styleBlock ? H.styleBlock(src, { path: s.styleBlock }).css : src;
+          if (C.definesVariable(css, ch.name)) { done = editCss(sheet, (c) => C.setVariable(c, ch.name, ch.value)); break; }
+        }
+        if (!done) throw new H.EditError(`Couldn't find where ${ch.name} is defined.`);
+        results.push({ label, file: done });
+        break;
+      }
+      case 'font-link': {
+        try {
+          const abs = htmlFile({ file: ch.file });
+          put(abs, H.ensureFontLink(get(abs), ch.family));
+          results.push({ label, file: rel(abs) });
+        } catch (e) {
+          if (!ch.optional) throw e;
+          results.push({ label, warning: `Add the ${ch.family} font to your page's <head> yourself (no HTML file found).` });
+        }
+        break;
+      }
+      case 'move': {
+        const abs = htmlFile(ch.loc);
+        const r = H.moveElement(get(abs), { ...ch.loc, dir: ch.dir });
+        put(abs, r.src);
+        reload = { path: `${ch.loc.file}#${r.newPath}` };
+        results.push({ label, file: rel(abs) });
+        break;
+      }
+      default:
+        throw new H.EditError(`Unknown change kind ${ch.kind}`, 400);
+    }
+  }
+
+  const writes = {};
+  for (const [abs, content] of files) if (content !== original.get(abs)) writes[abs] = content;
+  return { writes, results, reload };
+}
+
+// For framework projects with no source map: find the one place in the source
+// that contains this exact text (or class string). If it's not exactly one
+// place, refuse; guessing is how files get corrupted.
+export function searchReplace(root, needle, replacement, get, { mode }) {
+  if (!needle) throw new H.EditError('Nothing to search for.', 400);
+  const variants = mode === 'text' ? [needle, H.escapeText(needle)] : [needle];
+  const hits = [];
+  const walkDir = (dir) => {
+    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (ent.name.startsWith('.')) continue;
+      const abs = path.join(dir, ent.name);
+      if (ent.isDirectory()) { if (!SKIP_DIRS.has(ent.name)) walkDir(abs); continue; }
+      if (!SOURCE_EXT.has(path.extname(ent.name).toLowerCase())) continue;
+      const src = get(abs);
+      for (const v of variants) {
+        let i = src.indexOf(v);
+        while (i !== -1) {
+          if (mode === 'class') {
+            // must be the whole attribute value: class="..." / className="..." / className={'...'} / `...`
+            const before = src.slice(Math.max(0, i - 14), i);
+            const after = src[i + v.length];
+            if (!/(class|className)\s*=\s*\{?\s*["'`]$/.test(before) || !/["'`]/.test(after)) { i = src.indexOf(v, i + 1); continue; }
+          }
+          hits.push({ abs, i, v });
+          i = src.indexOf(v, i + 1);
+        }
+      }
+    }
+  };
+  walkDir(root);
+  if (hits.length === 0) throw new H.EditError(`Couldn't find "${needle.slice(0, 60)}" in your source files. It may be built from data or code.`);
+  if (hits.length > 1) {
+    const where = [...new Set(hits.map((h) => path.relative(root, h.abs)))].join(', ');
+    throw new H.EditError(`"${needle.slice(0, 60)}" appears ${hits.length} times (${where}), so editing it here could change the wrong one.`);
+  }
+  const [h] = hits;
+  const src = get(h.abs);
+  const rep = mode === 'text' && h.v !== needle ? H.escapeText(replacement) : replacement;
+  return { abs: h.abs, content: src.slice(0, h.i) + rep + src.slice(h.i + h.v.length) };
+}

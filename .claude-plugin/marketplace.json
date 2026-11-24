@@ -1,0 +1,11 @@
+{
+  "name": "editor-mode",
+  "owner": { "name": "editor-mode contributors" },
+  "plugins": [
+    {
+      "name": "editor-mode",
+      "source": "./",
+      "description": "Click-to-edit visual editor for localhost sites, with git commits and a Claude hand-off for complex changes."
+    }
+  ]
+}
